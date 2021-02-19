@@ -203,11 +203,11 @@ func (c *commonCtl) reqIDInfo(msgID int) (string, time.Time) {
 // multibuttonMarkup returns a markup containing a bunch of buttons.  If
 // showCounter is true, will show a counter beside each of the labels. each
 // telegram button will have a button index pressed by the user in the
-// callback.Data.
-func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
+// callback.Data. Prefix is the prefix that will be prepended to the unique
+// before hash is called to form the Control-specific unique fields.
+func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix string, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
 	const (
-		prefix = "mb"
-		sep    = ": "
+		sep = ": "
 	)
 	if cbFn == nil {
 		panic("internal error: callback function is empty")

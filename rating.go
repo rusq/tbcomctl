@@ -80,13 +80,14 @@ func (ri *Button) String() string {
 }
 
 func (rb *Rating) Markup(btns [2]Button) *tb.ReplyMarkup {
-	return rb.multibuttonMarkup(btns[:], rb.hasCounter, rb.callback)
+	const rbPrefix = "rating"
+	return rb.multibuttonMarkup(btns[:], rb.hasCounter, rbPrefix, rb.callback)
 }
 
 var ErrAlreadyVoted = errors.New("already voted")
 
 func (rb *Rating) callback(cb *tb.Callback) {
-	respErr := tb.CallbackResponse{Text: "internal error"}
+	respErr := tb.CallbackResponse{Text: MsgUnexpected}
 	i, err := strconv.Atoi(cb.Data)
 	if err != nil {
 		dlog.Printf("failed to get the button index from data: %s", cb.Data)
@@ -109,7 +110,7 @@ func (rb *Rating) callback(cb *tb.Callback) {
 		return
 	}
 
-	msg := "vote counted"
+	msg := MsgVoteCounted
 	if valErr == ErrAlreadyVoted && !rb.allowUnvote {
 		msg = ""
 	}

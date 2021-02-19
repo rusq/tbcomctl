@@ -3,7 +3,9 @@
 package tbcomctl
 
 import (
+	"crypto/sha1"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +40,15 @@ type (
 	CallbackHandler func(cb *tb.Callback)
 )
 
+type StoredMessage struct {
+	MessageID string
+	ChatID    int64
+}
+
+func (m StoredMessage) MessageSig() (string, int64) {
+	return m.MessageID, m.ChatID
+}
+
 // TextFunc returns values for inline buttons, possibly personalised for user u.
 type ValuesFunc func(u *tb.User) ([]string, error)
 
@@ -48,9 +59,9 @@ type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
 
 type ErrFunc func(m *tb.Message, err error)
 
-// CallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
+// BtnCallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
 // ErrRetry if the retry should be performed.
-type CallbackFunc func(cb *tb.Callback) error
+type BtnCallbackFunc func(cb *tb.Callback) error
 
 var (
 	// ErrRetry should be returned by CallbackFunc if the retry should be performed.
@@ -58,6 +69,14 @@ var (
 	// ErrNoChange should be returned if the user picked the same value as before, and no update needed.
 	ErrNoChange = errors.New("no change")
 )
+
+var hasher = sha1.New
+
+func hash(s string) string {
+	h := hasher()
+	h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
 
 type option func(ctl *commonCtl)
 

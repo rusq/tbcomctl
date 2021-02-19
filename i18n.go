@@ -6,10 +6,11 @@ import (
 )
 
 const (
-	MsgUnexpected = "Unexpected error occurred."
-	MsgRetry      = "Incorrect choice."
-	MsgChooseVal  = "Choose value from the list:"
-	MsgOK         = "Changed successfully."
+	MsgUnexpected  = "Unexpected error occurred."
+	MsgRetry       = "Incorrect choice."
+	MsgChooseVal   = "Choose value from the list:"
+	MsgOK          = "Changed successfully."
+	MsgVoteCounted = "Vote counted."
 )
 
 var translations = map[language.Tag][]i18nmsg{
@@ -18,6 +19,7 @@ var translations = map[language.Tag][]i18nmsg{
 		{MsgRetry, "Неверный выбор"},
 		{MsgChooseVal, "Сделайте выбор из списка:"},
 		{MsgOK, "Успешно изменено."},
+		{MsgVoteCounted, "Голос учтен."},
 	},
 }
 

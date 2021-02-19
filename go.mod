@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/google/uuid v1.2.0
+	github.com/joho/godotenv v1.3.0
 	github.com/rusq/dlog v1.3.0
 	golang.org/x/text v0.3.5
 	gopkg.in/tucnak/telebot.v2 v2.3.5

@@ -1,7 +1,6 @@
 package tbcomctl
 
 import (
-	"crypto/sha1"
 	"fmt"
 	"log"
 	"strings"
@@ -18,11 +17,11 @@ const (
 
 type Picklist struct {
 	*commonCtl
+	*buttons
 	removeButtons bool
-	maxButtons    int
 
 	vFn  ValuesFunc
-	cbFn CallbackFunc
+	cbFn BtnCallbackFunc
 }
 
 type PicklistOption func(p *Picklist)
@@ -53,14 +52,12 @@ func PickOptFallbackLang(lang string) PicklistOption {
 
 func PickOptMaxInlineButtons(n int) PicklistOption {
 	return func(p *Picklist) {
-		if n <= 0 || maxButtons < n {
-			n = defNumButtons
-		}
-		p.maxButtons = n
+		p.buttons.SetMaxButtons(n)
 	}
 }
 
-func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn CallbackFunc, next MsgHandler, opts ...PicklistOption) *Picklist {
+// NewPicklist creates a new picklist.
+func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, next MsgHandler, opts ...PicklistOption) *Picklist {
 	if b == nil {
 		panic("bot is required")
 	}
@@ -73,9 +70,9 @@ func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn Callb
 			textFn: textFn,
 			next:   next,
 		},
-		vFn:        valuesFn,
-		cbFn:       callbackFn,
-		maxButtons: defNumButtons,
+		vFn:     valuesFn,
+		cbFn:    callbackFn,
+		buttons: &buttons{maxButtons: defNumButtons},
 	}
 	for _, opt := range opts {
 		opt(p)
@@ -171,25 +168,8 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 	return true
 }
 
-var hasher = sha1.New
-
-func hash(s string) string {
-	h := hasher()
-	h.Write([]byte(s))
-	return fmt.Sprintf("%x", h.Sum(nil))
-}
-
 func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
-	selector := new(tb.ReplyMarkup)
-	var btns []tb.Btn
-	for _, label := range values {
-		btn := selector.Data(label, hash(label), label)
-		btns = append(btns, btn)
-		p.b.Handle(&btn, p.Callback())
-	}
-
-	selector.Inline(organizeButtons(selector, btns, p.maxButtons)...)
-	return selector
+	return ButtonMarkup(p.b, values, p.maxButtons, p.Callback())
 }
 
 func (p *Picklist) processErr(b Boter, m *tb.Message, err error) {

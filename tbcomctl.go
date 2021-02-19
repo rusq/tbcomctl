@@ -3,7 +3,10 @@
 package tbcomctl
 
 import (
+	"crypto/sha1"
 	"errors"
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -38,6 +41,15 @@ type (
 	CallbackHandler func(cb *tb.Callback)
 )
 
+type StoredMessage struct {
+	MessageID string
+	ChatID    int64
+}
+
+func (m StoredMessage) MessageSig() (string, int64) {
+	return m.MessageID, m.ChatID
+}
+
 // TextFunc returns values for inline buttons, possibly personalised for user u.
 type ValuesFunc func(u *tb.User) ([]string, error)
 
@@ -48,9 +60,9 @@ type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
 
 type ErrFunc func(m *tb.Message, err error)
 
-// CallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
+// BtnCallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
 // ErrRetry if the retry should be performed.
-type CallbackFunc func(cb *tb.Callback) error
+type BtnCallbackFunc func(cb *tb.Callback) error
 
 var (
 	// ErrRetry should be returned by CallbackFunc if the retry should be performed.
@@ -58,6 +70,14 @@ var (
 	// ErrNoChange should be returned if the user picked the same value as before, and no update needed.
 	ErrNoChange = errors.New("no change")
 )
+
+var hasher = sha1.New
+
+func hash(s string) string {
+	h := hasher()
+	h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
 
 type option func(ctl *commonCtl)
 
@@ -178,4 +198,30 @@ func (c *commonCtl) reqIDInfo(msgID int) (string, time.Time) {
 		return unknown, time.Time{}
 	}
 	return reqID.String(), time.Unix(reqID.Time().UnixTime())
+}
+
+// multibuttonMarkup returns a markup containing a bunch of buttons.  If
+// showCounter is true, will show a counter beside each of the labels. each
+// telegram button will have a button index pressed by the user in the
+// callback.Data. Prefix is the prefix that will be prepended to the unique
+// before hash is called to form the Control-specific unique fields.
+func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix string, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
+	const (
+		sep = ": "
+	)
+	if cbFn == nil {
+		panic("internal error: callback function is empty")
+	}
+	markup := new(tb.ReplyMarkup)
+
+	var buttons []tb.Btn
+	for i, ri := range btns {
+		bn := markup.Data(ri.label(showCounter, sep), hash(prefix+ri.Name), strconv.Itoa(i))
+		buttons = append(buttons, bn)
+		c.b.Handle(&bn, cbFn)
+	}
+
+	markup.Inline(organizeButtons(markup, buttons, defNumButtons)...)
+
+	return markup
 }

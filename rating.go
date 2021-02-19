@@ -98,14 +98,14 @@ func (rb *Rating) callback(cb *tb.Callback) {
 	// get existing value for the post
 	buttons, valErr := rb.rateFn(cb.Message, cb.Sender, i)
 	if valErr != nil && valErr != ErrAlreadyVoted {
-		dlog.Println("failed to get the data from the rating callback for msg %v: %s", cb.Message, err)
+		dlog.Printf("failed to get the data from the rating callback for msg %v: %s", cb.Message, err)
 		rb.b.Respond(cb, &respErr)
 		return
 	}
 
 	// update the post with new buttons
 	if _, err := rb.b.Edit(cb.Message, rb.Markup(buttons)); err != nil {
-		dlog.Println("failed to edit the message: %v: %s", cb.Message, err)
+		dlog.Printf("failed to edit the message: %v: %s", cb.Message, err)
 		rb.b.Respond(cb, &respErr)
 		return
 	}

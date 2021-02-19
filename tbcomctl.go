@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -197,4 +198,30 @@ func (c *commonCtl) reqIDInfo(msgID int) (string, time.Time) {
 		return unknown, time.Time{}
 	}
 	return reqID.String(), time.Unix(reqID.Time().UnixTime())
+}
+
+// multibuttonMarkup returns a markup containing a bunch of buttons.  If
+// showCounter is true, will show a counter beside each of the labels. each
+// telegram button will have a button index pressed by the user in the
+// callback.Data.
+func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
+	const (
+		prefix = "mb"
+		sep    = ": "
+	)
+	if cbFn == nil {
+		panic("internal error: callback function is empty")
+	}
+	markup := new(tb.ReplyMarkup)
+
+	var buttons []tb.Btn
+	for i, ri := range btns {
+		bn := markup.Data(ri.label(showCounter, sep), hash(prefix+ri.Name), strconv.Itoa(i))
+		buttons = append(buttons, bn)
+		c.b.Handle(&bn, cbFn)
+	}
+
+	markup.Inline(organizeButtons(markup, buttons, defNumButtons)...)
+
+	return markup
 }

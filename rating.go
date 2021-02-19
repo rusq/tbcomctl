@@ -11,7 +11,7 @@ import (
 
 // Rating is a customizable struct for attaching post rating.
 type Rating struct {
-	b Boter
+	commonCtl
 
 	hasRating   bool // show post rating between up/down vote buttons
 	hasCounter  bool // show counter of total upvotes-downvotes.
@@ -52,8 +52,8 @@ type RatingType int
 
 func NewRating(b Boter, fn RatingFunc, opts ...RBOption) *Rating {
 	rb := &Rating{
-		b:      b,
-		rateFn: fn,
+		commonCtl: commonCtl{b: b},
+		rateFn:    fn,
 	}
 	for _, opt := range opts {
 		opt(rb)
@@ -80,22 +80,7 @@ func (ri *Button) String() string {
 }
 
 func (rb *Rating) Markup(btns [2]Button) *tb.ReplyMarkup {
-	const (
-		prefix = "rb"
-		sep    = ": "
-	)
-	markup := new(tb.ReplyMarkup)
-
-	var buttons []tb.Btn
-	for i, ri := range btns {
-		bn := markup.Data(ri.label(rb.hasCounter, sep), hash(prefix+ri.Name), strconv.Itoa(i))
-		buttons = append(buttons, bn)
-		rb.b.Handle(&bn, rb.callback)
-	}
-
-	markup.Inline(organizeButtons(markup, buttons, defNumButtons)...)
-
-	return markup
+	return rb.multibuttonMarkup(btns[:], rb.hasCounter, rb.callback)
 }
 
 var ErrAlreadyVoted = errors.New("already voted")
@@ -117,11 +102,13 @@ func (rb *Rating) callback(cb *tb.Callback) {
 		return
 	}
 
+	// update the post with new buttons
 	if _, err := rb.b.Edit(cb.Message, rb.Markup(buttons)); err != nil {
 		dlog.Println("failed to edit the message: %v: %s", cb.Message, err)
 		rb.b.Respond(cb, &respErr)
 		return
 	}
+
 	msg := "vote counted"
 	if valErr == ErrAlreadyVoted && !rb.allowUnvote {
 		msg = ""

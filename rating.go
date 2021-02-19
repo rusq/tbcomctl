@@ -1,10 +1,9 @@
 package tbcomctl
 
 import (
-	"encoding/json"
 	"errors"
+	"fmt"
 	"strconv"
-	"sync"
 
 	"github.com/rusq/dlog"
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -12,22 +11,19 @@ import (
 
 // Rating is a customizable struct for attaching post rating.
 type Rating struct {
-	commonCtl
+	b Boter
 
 	hasRating   bool // show post rating between up/down vote buttons
 	hasCounter  bool // show counter of total upvotes-downvotes.
 	allowUnvote bool // allow user to revoke the vote, otherwise - do nothing.
 
 	rateFn RatingFunc //
-
-	btns []Button
-	idx  map[string]int // button index by label
-	mu   sync.Mutex
 }
 
-// RatingFunc is the function called by callback, given the message and
-// button it should update the records and return the value and an error.
-type RatingFunc func(tb.Editable, tb.Recipient, Button) (int, error)
+// RatingFunc is the function called by callback, given the message, user
+// and the button index it should update the records and return the new buttons
+// with updated values for the posting, it must maintain count of votes inhouse.
+type RatingFunc func(tb.Editable, tb.Recipient, int) ([2]Button, error)
 
 type RBOption func(*Rating)
 
@@ -52,30 +48,13 @@ func RBOptAllowUnvote(b bool) RBOption {
 	}
 }
 
-var defRatingBtns = [2]Button{
-	{"↑", 0},
-	{"↓", 0},
-}
-
-func RBOptButtons(btns [2]Button) RBOption {
-	return func(rb *Rating) {
-		rb.btns = btns[:]
-		// indexing buttons for fast updates
-		for i, btn := range btns {
-			rb.idx[btn.Name] = i
-		}
-	}
-}
+type RatingType int
 
 func NewRating(b Boter, fn RatingFunc, opts ...RBOption) *Rating {
 	rb := &Rating{
-		commonCtl: commonCtl{
-			b: b,
-		},
+		b:      b,
 		rateFn: fn,
-		idx:    make(map[string]int, len(defRatingBtns)),
 	}
-	RBOptButtons(defRatingBtns)(rb)
 	for _, opt := range opts {
 		opt(rb)
 	}
@@ -97,14 +76,10 @@ func (ri *Button) label(counter bool, sep string) string {
 }
 
 func (ri *Button) String() string {
-	data, err := json.Marshal(ri)
-	if err != nil {
-		panic(err)
-	}
-	return string(data)
+	return fmt.Sprintf("<Button name: %s, value: %d>", ri.Name, ri.Value)
 }
 
-func (rb *Rating) Markup() *tb.ReplyMarkup {
+func (rb *Rating) Markup(btns [2]Button) *tb.ReplyMarkup {
 	const (
 		prefix = "rb"
 		sep    = ": "
@@ -112,8 +87,8 @@ func (rb *Rating) Markup() *tb.ReplyMarkup {
 	markup := new(tb.ReplyMarkup)
 
 	var buttons []tb.Btn
-	for _, ri := range rb.btns {
-		bn := markup.Data(ri.label(rb.hasCounter, sep), hash(prefix+ri.Name), strconv.Itoa(rb.idx[ri.Name]))
+	for i, ri := range btns {
+		bn := markup.Data(ri.label(rb.hasCounter, sep), hash(prefix+ri.Name), strconv.Itoa(i))
 		buttons = append(buttons, bn)
 		rb.b.Handle(&bn, rb.callback)
 	}
@@ -126,28 +101,26 @@ func (rb *Rating) Markup() *tb.ReplyMarkup {
 var ErrAlreadyVoted = errors.New("already voted")
 
 func (rb *Rating) callback(cb *tb.Callback) {
-	respErr := tb.CallbackResponse{Text: "something went wrong"}
-	i, err := strconv.ParseInt(cb.Data, 10, 32)
+	respErr := tb.CallbackResponse{Text: "internal error"}
+	i, err := strconv.Atoi(cb.Data)
 	if err != nil {
 		dlog.Printf("failed to get the button index from data: %s", cb.Data)
 		rb.b.Respond(cb, &respErr)
+		return
 	}
 
-	rb.mu.Lock()
-	defer rb.mu.Unlock()
-
 	// get existing value for the post
-	newVal, valErr := rb.rateFn(cb.Message, cb.Sender, rb.btns[i])
+	buttons, valErr := rb.rateFn(cb.Message, cb.Sender, i)
 	if valErr != nil && valErr != ErrAlreadyVoted {
 		dlog.Println("failed to get the data from the rating callback for msg %v: %s", cb.Message, err)
 		rb.b.Respond(cb, &respErr)
 		return
 	}
-	rb.btns[i].Value = newVal
 
-	if _, err := rb.b.Edit(cb.Message, rb.Markup()); err != nil {
+	if _, err := rb.b.Edit(cb.Message, rb.Markup(buttons)); err != nil {
 		dlog.Println("failed to edit the message: %v: %s", cb.Message, err)
 		rb.b.Respond(cb, &respErr)
+		return
 	}
 	msg := "vote counted"
 	if valErr == ErrAlreadyVoted && !rb.allowUnvote {

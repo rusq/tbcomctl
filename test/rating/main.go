@@ -31,7 +31,7 @@ func main() {
 	}
 
 	rb := tbcomctl.NewRating(b,
-		func(e tb.Editable, r tb.Recipient, idx int) ([2]tbcomctl.Button, error) {
+		func(e tb.Editable, r *tb.User, idx int) ([2]tbcomctl.Button, error) {
 			mid, cid := e.MessageSig()
 			dlog.Printf("%s, %d: u: %s, idx %d", mid, cid, r.Recipient(), idx)
 			btns := getButtons(cid, mid, r.Recipient())

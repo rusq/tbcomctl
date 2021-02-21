@@ -23,7 +23,7 @@ type Rating struct {
 // RatingFunc is the function called by callback, given the message, user
 // and the button index it should update the records and return the new buttons
 // with updated values for the posting, it must maintain count of votes inhouse.
-type RatingFunc func(tb.Editable, tb.Recipient, int) ([2]Button, error)
+type RatingFunc func(tb.Editable, *tb.User, int) ([2]Button, error)
 
 type RBOption func(*Rating)
 

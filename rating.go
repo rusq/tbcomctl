@@ -98,7 +98,8 @@ func (rb *Rating) callback(cb *tb.Callback) {
 	// get existing value for the post
 	buttons, valErr := rb.rateFn(cb.Message, cb.Sender, i)
 	if valErr != nil && valErr != ErrAlreadyVoted {
-		dlog.Printf("failed to get the data from the rating callback for msg %v: %s", cb.Message, err)
+		dlog.Printf("failed to get the data from the rating callback: %s", valErr)
+		dlog.Debugf("callback: %s", Sdump(cb))
 		rb.b.Respond(cb, &respErr)
 		return
 	}

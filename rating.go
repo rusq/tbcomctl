@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/rusq/dlog"
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -13,9 +14,8 @@ import (
 type Rating struct {
 	commonCtl
 
-	hasRating   bool // show post rating between up/down vote buttons
-	hasCounter  bool // show counter of total upvotes-downvotes.
-	allowUnvote bool // allow user to revoke the vote, otherwise - do nothing.
+	hasRating  bool // show post rating between up/down vote buttons
+	hasCounter bool // show counter of total upvotes-downvotes.
 
 	rateFn RatingFunc //
 }
@@ -41,13 +41,6 @@ func RBOptShowPostRating(b bool) RBOption {
 	}
 }
 
-// RBOptAllowUnvote allows user to revoke their vote.
-func RBOptAllowUnvote(b bool) RBOption {
-	return func(rb *Rating) {
-		rb.allowUnvote = b
-	}
-}
-
 type RatingType int
 
 func NewRating(b Boter, fn RatingFunc, opts ...RBOption) *Rating {
@@ -62,7 +55,7 @@ func NewRating(b Boter, fn RatingFunc, opts ...RBOption) *Rating {
 }
 
 type Button struct {
-	Name  string `json:"l"`
+	Name  string `json:"n"`
 	Value int    `json:"v"`
 }
 
@@ -104,16 +97,20 @@ func (rb *Rating) callback(cb *tb.Callback) {
 		return
 	}
 
+	var msg string
 	// update the post with new buttons
-	if _, err := rb.b.Edit(cb.Message, rb.Markup(buttons)); err != nil {
-		dlog.Printf("failed to edit the message: %v: %s", cb.Message, err)
-		rb.b.Respond(cb, &respErr)
-		return
+	if valErr != ErrAlreadyVoted {
+		if _, err := rb.b.Edit(cb.Message, rb.Markup(buttons)); err != nil {
+			if e, ok := err.(*tb.APIError); ok && e.Code == 400 && strings.Contains(e.Description, "exactly the same") {
+				dlog.Printf("%s: same button pressed", Userinfo(cb.Sender))
+			} else {
+				dlog.Printf("failed to edit the message: %v: %s", cb.Message, err)
+				rb.b.Respond(cb, &respErr)
+				return
+			}
+		}
+		msg = MsgVoteCounted
 	}
 
-	msg := MsgVoteCounted
-	if valErr == ErrAlreadyVoted && !rb.allowUnvote {
-		msg = ""
-	}
 	rb.b.Respond(cb, &tb.CallbackResponse{Text: msg})
 }

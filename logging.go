@@ -11,20 +11,23 @@ import (
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
-// Logger is the interface for logging.  Package also has debug logging enabled
-// by setting DEBUG environment variable to any value.
+const (
+	None         = "<none>"
+	notAvailable = "N/A"
+	chatPrivate  = "private"
+)
+
+// lg is the package logger.
+var lg Logger = dlog.FromContext(context.Background()) // getting default logger
+// dlg is the debug logger.
+var dlg Logger = nologger{}
+
+// Logger is the interface for logging.
 type Logger interface {
 	Print(v ...interface{})
 	Println(v ...interface{})
 	Printf(format string, a ...interface{})
 }
-
-// package logger.
-var lg Logger = dlog.FromContext(context.Background()) // getting default logger
-
-const None = "<none>"
-const notAvailable = "N/A"
-const chatPrivate = "private"
 
 // Userinfo returns the user info.
 func Userinfo(u *tb.User) string {
@@ -72,6 +75,20 @@ func SetLogger(l Logger) {
 		return
 	}
 	lg = l
+}
+
+// SetDebugLogger sets the debug logger which is used to output debug messages,
+// if you must.  By default, debug logging is disabled.
+func SetDebugLogger(l Logger) {
+	if l == nil {
+		return
+	}
+	dlg = l
+}
+
+// NoDebugLogger switches off debug messages.
+func NoDebugLogger() {
+	dlg = nologger{}
 }
 
 // GetLogger returns current logger.

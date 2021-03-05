@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/rusq/dlog"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
@@ -92,7 +91,7 @@ func (rb *Rating) callback(cb *tb.Callback) {
 	buttons, valErr := rb.rateFn(cb.Message, cb.Sender, i)
 	if valErr != nil && valErr != ErrAlreadyVoted {
 		lg.Printf("failed to get the data from the rating callback: %s", valErr)
-		dlog.Debugf("callback: %s", Sdump(cb))
+		dlg.Printf("callback: %s", Sdump(cb))
 		rb.b.Respond(cb, &respErr)
 		return
 	}

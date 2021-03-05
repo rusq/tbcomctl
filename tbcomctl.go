@@ -13,8 +13,6 @@ import (
 
 	"golang.org/x/text/language"
 
-	"github.com/rusq/dlog"
-
 	"github.com/google/uuid"
 
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -177,7 +175,7 @@ func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.R
 
 // logCallback logs callback data.
 func (c *commonCtl) logCallback(cb *tb.Callback) {
-	dlog.Debugf("%s: callback dump: %s", Userinfo(cb.Sender), Sdump(cb))
+	dlg.Printf("%s: callback dump: %s", Userinfo(cb.Sender), Sdump(cb))
 
 	reqID, at := c.reqIDInfo(cb.Message.ID)
 	lg.Printf("%s> %s: msg sent at %s, user response in: %s, callback data: %q", reqID, Userinfo(cb.Sender), at, time.Since(at), cb.Data)
@@ -185,7 +183,7 @@ func (c *commonCtl) logCallback(cb *tb.Callback) {
 
 // logOutgoingMsg logs the outgoing message and any additional string info passed in s.
 func (c *commonCtl) logOutgoingMsg(m *tb.Message, s ...string) {
-	dlog.Debugf("%s: message dump: %s", Userinfo(m.Sender), Sdump(m))
+	dlg.Printf("%s: message dump: %s", Userinfo(m.Sender), Sdump(m))
 
 	reqID, at := c.reqIDInfo(m.ID)
 	lg.Printf("%s> msg to chat: %s, req time: %s: %s", reqID, ChatInfo(m.Chat), at, strings.Join(s, " "))

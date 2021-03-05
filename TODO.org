@@ -1,0 +1,11 @@
+*** DONE  Ability to choose callback response type (alerts/notifications)
+    - errors are shown as alert, confirmations as responses.
+*** DONE logger from caller
+    Interface:
+    * Logger
+    Methods:
+    * SetLogger
+    * NoLogger
+    * SetDebugLogger
+    * NoDebugLogger
+*** TODO input field

@@ -83,7 +83,7 @@ func (rb *Rating) callback(cb *tb.Callback) {
 	respErr := tb.CallbackResponse{Text: MsgUnexpected}
 	i, err := strconv.Atoi(cb.Data)
 	if err != nil {
-		dlog.Printf("failed to get the button index from data: %s", cb.Data)
+		lg.Printf("failed to get the button index from data: %s", cb.Data)
 		rb.b.Respond(cb, &respErr)
 		return
 	}
@@ -91,7 +91,7 @@ func (rb *Rating) callback(cb *tb.Callback) {
 	// get existing value for the post
 	buttons, valErr := rb.rateFn(cb.Message, cb.Sender, i)
 	if valErr != nil && valErr != ErrAlreadyVoted {
-		dlog.Printf("failed to get the data from the rating callback: %s", valErr)
+		lg.Printf("failed to get the data from the rating callback: %s", valErr)
 		dlog.Debugf("callback: %s", Sdump(cb))
 		rb.b.Respond(cb, &respErr)
 		return
@@ -102,9 +102,9 @@ func (rb *Rating) callback(cb *tb.Callback) {
 	if valErr != ErrAlreadyVoted {
 		if _, err := rb.b.Edit(cb.Message, rb.Markup(buttons)); err != nil {
 			if e, ok := err.(*tb.APIError); ok && e.Code == 400 && strings.Contains(e.Description, "exactly the same") {
-				dlog.Printf("%s: same button pressed", Userinfo(cb.Sender))
+				lg.Printf("%s: same button pressed", Userinfo(cb.Sender))
 			} else {
-				dlog.Printf("failed to edit the message: %v: %s", cb.Message, err)
+				lg.Printf("failed to edit the message: %v: %s", cb.Message, err)
 				rb.b.Respond(cb, &respErr)
 				return
 			}

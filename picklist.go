@@ -2,10 +2,7 @@ package tbcomctl
 
 import (
 	"fmt"
-	"log"
 	"strings"
-
-	"github.com/rusq/dlog"
 
 	tb "gopkg.in/tucnak/telebot.v2"
 )
@@ -100,10 +97,10 @@ func (p *Picklist) Command() MsgHandler {
 			&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
 		)
 		if err != nil {
-			dlog.Println(err)
+			lg.Println(err)
 			return
 		}
-		_ = p.reqRegister(resp.ID)
+		_ = p.register(resp.ID)
 		p.logOutgoingMsg(resp, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
 	}
 }
@@ -120,19 +117,19 @@ func (p *Picklist) Callback() func(*tb.Callback) {
 		case ErrNoChange:
 			resp = tb.CallbackResponse{}
 		case ErrRetry:
-			p.b.Respond(cb, &tb.CallbackResponse{Text: MsgRetry})
+			p.b.Respond(cb, &tb.CallbackResponse{Text: MsgRetry, ShowAlert: true})
 			return
 		default: //err !=nil
 			p.editMsg(cb)
-			p.b.Respond(cb, &tb.CallbackResponse{Text: err.Error()})
-			p.reqUnregister(cb.Message.ID)
+			p.b.Respond(cb, &tb.CallbackResponse{Text: err.Error(), ShowAlert: true})
+			p.unregister(cb.Message.ID)
 			return
 		}
 		// edit message
 		p.editMsg(cb)
 		p.b.Respond(cb, &resp)
 		p.nextHandler(cb)
-		p.reqUnregister(cb.Message.ID)
+		p.unregister(cb.Message.ID)
 	}
 }
 
@@ -143,7 +140,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 			p.textFn(cb.Sender),
 			&tb.SendOptions{ParseMode: tb.ModeHTML},
 		); err != nil {
-			dlog.Println(err)
+			lg.Println(err)
 			return false
 		}
 		return true
@@ -161,7 +158,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 		fmt.Sprintf("%s\n\n%s", p.textFn(cb.Sender), pr.Sprintf(MsgChooseVal)),
 		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
 	); err != nil {
-		dlog.Println(err)
+		lg.Println(err)
 		return false
 	}
 
@@ -174,11 +171,11 @@ func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
 
 func (p *Picklist) processErr(b Boter, m *tb.Message, err error) {
 	pr := Printer(m.Sender.LanguageCode, p.lang)
-	log.Println(err)
+	lg.Println(err)
 	if p.errFn == nil {
 		b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
 	} else {
-		dlog.Println("calling error message handler")
+		lg.Println("calling error message handler")
 		p.errFn(m, err)
 	}
 }

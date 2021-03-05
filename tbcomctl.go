@@ -126,8 +126,8 @@ func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {
 	}
 }
 
-// reqRegister registers message in cache assigning it a request id.
-func (c *commonCtl) reqRegister(msgID int) uuid.UUID {
+// register registers message in cache assigning it a request id.
+func (c *commonCtl) register(msgID int) uuid.UUID {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.reqCache == nil {
@@ -150,7 +150,7 @@ func (c *commonCtl) requestFor(msgID int) (uuid.UUID, bool) {
 	return reqID, ok
 }
 
-func (c *commonCtl) reqUnregister(msgID int) {
+func (c *commonCtl) unregister(msgID int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.reqCache, msgID)
@@ -180,7 +180,7 @@ func (c *commonCtl) logCallback(cb *tb.Callback) {
 	dlog.Debugf("%s: callback dump: %s", Userinfo(cb.Sender), Sdump(cb))
 
 	reqID, at := c.reqIDInfo(cb.Message.ID)
-	dlog.Printf("%s> %s: msg sent at %s, user response in: %s, callback data: %q", reqID, Userinfo(cb.Sender), at, time.Since(at), cb.Data)
+	lg.Printf("%s> %s: msg sent at %s, user response in: %s, callback data: %q", reqID, Userinfo(cb.Sender), at, time.Since(at), cb.Data)
 }
 
 // logOutgoingMsg logs the outgoing message and any additional string info passed in s.
@@ -188,7 +188,7 @@ func (c *commonCtl) logOutgoingMsg(m *tb.Message, s ...string) {
 	dlog.Debugf("%s: message dump: %s", Userinfo(m.Sender), Sdump(m))
 
 	reqID, at := c.reqIDInfo(m.ID)
-	dlog.Printf("%s> msg to chat: %s, req time: %s: %s", reqID, ChatInfo(m.Chat), at, strings.Join(s, " "))
+	lg.Printf("%s> msg to chat: %s, req time: %s: %s", reqID, ChatInfo(m.Chat), at, strings.Join(s, " "))
 }
 
 // reqIDInfo returns a request ID (or <unknown) and a time of the request (or zero time).

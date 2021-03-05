@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/rusq/dlog"
 	"github.com/rusq/tbcomctl"
 	tb "gopkg.in/tucnak/telebot.v2"
 )
@@ -33,7 +32,7 @@ func main() {
 	rb := tbcomctl.NewRating(b,
 		func(e tb.Editable, r *tb.User, idx int) ([2]tbcomctl.Button, error) {
 			mid, cid := e.MessageSig()
-			dlog.Printf("%s, %d: u: %s, idx %d", mid, cid, r.Recipient(), idx)
+			log.Printf("%s, %d: u: %s, idx %d", mid, cid, r.Recipient(), idx)
 			btns := getButtons(cid, mid, r.Recipient())
 			btns[idx].Value++
 			ratings[cid][mid] = btns

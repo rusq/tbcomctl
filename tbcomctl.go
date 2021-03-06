@@ -41,12 +41,6 @@ type Controller interface {
 	Next(Controller)
 }
 
-// Standard message and Callback handlers signatures.
-type (
-	MsgHandler      func(m *tb.Message)
-	CallbackHandler func(cb *tb.Callback)
-)
-
 type StoredMessage struct {
 	MessageID string
 	ChatID    int64

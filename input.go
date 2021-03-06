@@ -30,6 +30,14 @@ var _ Controller = &Input{}
 // offered to retry the input.
 type MsgErrFunc func(m *tb.Message) error
 
+type InputOption func(*Input)
+
+func IOptNoReply(b bool) InputOption {
+	return func(ip *Input) {
+		ip.noReply = true
+	}
+}
+
 // NewInput text creates a new text input, optionally chaining with the `next`
 // handler. One must use Handle as a handler for bot endpoint, and then hook the
 // OnText to OnTextMw.  msgFn is the function that should produce the text that
@@ -73,35 +81,35 @@ func (e *InputError) Error() string {
 	return "input error: " + e.Message
 }
 
-func (f *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
+func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 	return func(m *tb.Message) {
-		if !f.await[m.Sender.Recipient()] {
+		if !ip.await[m.Sender.Recipient()] {
 			if fn != nil {
 				fn(m)
 			}
 			return
 		}
 
-		valueErr := f.OnTextFn(m)
+		valueErr := ip.OnTextFn(m)
 		if valueErr != nil {
 			// wrong input or some other problem
 			lg.Println(valueErr)
 			if e, ok := valueErr.(*InputError); ok {
-				f.processError(m, e.Message)
+				ip.processError(m, e.Message)
 				return
 			} else {
-				if _, err := f.b.Send(m.Sender, MsgUnexpected); err != nil {
+				if _, err := ip.b.Send(m.Sender, MsgUnexpected); err != nil {
 					lg.Println(err)
 					return
 				}
 			}
 		}
 
-		f.await[m.Sender.Recipient()] = false
+		ip.await[m.Sender.Recipient()] = false
 
-		if f.next != nil && valueErr == nil {
+		if ip.next != nil && valueErr == nil {
 			// if there are chained controls
-			f.next(m)
+			ip.next(m)
 		} else {
 			// run the initial handler
 			fn(m)
@@ -109,14 +117,14 @@ func (f *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 	}
 }
 
-func (f *Input) processError(m *tb.Message, errmsg string) {
-	if _, err := f.b.Send(m.Sender, errmsg); err != nil {
+func (ip *Input) processError(m *tb.Message, errmsg string) {
+	if _, err := ip.b.Send(m.Sender, errmsg); err != nil {
 		return
 	}
-	if err := f.b.Notify(m.Sender, tb.Typing); err != nil {
+	if err := ip.b.Notify(m.Sender, tb.Typing); err != nil {
 		lg.Println(err)
 		return
 	}
 	time.Sleep(retryDelay)
-	f.Handler(m)
+	ip.Handler(m)
 }

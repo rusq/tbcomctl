@@ -41,10 +41,6 @@ type Controller interface {
 	Next(Controller)
 }
 
-type OnTexter interface {
-	OnTextMw(next func(m *tb.Message)) func(*tb.Message)
-}
-
 // Standard message and Callback handlers signatures.
 type (
 	MsgHandler      func(m *tb.Message)
@@ -252,11 +248,10 @@ func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) 
 	return first.Handler
 }
 
-func NewOnTextChain(final func(m *tb.Message), ot ...OnTexter) func(m *tb.Message) {
-	var chain = final
-	for i := len(ot) - 1; i >= 0; i-- {
-		chain = ot[i].OnTextMw(chain)
-
+func NewMiddlewareChain(final func(m *tb.Message), mw ...MiddlewareFunc) func(m *tb.Message) {
+	var handler = final
+	for i := len(mw) - 1; i >= 0; i-- {
+		handler = mw[i](handler)
 	}
-	return chain
+	return handler
 }

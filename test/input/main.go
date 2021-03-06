@@ -33,7 +33,7 @@ func main() {
 	handler := tbcomctl.NewControllerChain(nameIp, ageIp)
 
 	b.Handle("/input", handler)
-	b.Handle(tb.OnText, tbcomctl.NewOnTextChain(onText, nameIp, ageIp))
+	b.Handle(tb.OnText, tbcomctl.NewMiddlewareChain(onText, nameIp.OnTextMw, ageIp.OnTextMw))
 
 	b.Start()
 }

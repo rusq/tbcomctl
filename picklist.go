@@ -21,6 +21,8 @@ type Picklist struct {
 	cbFn BtnCallbackFunc
 }
 
+var _ Controller = &Picklist{}
+
 type PicklistOption func(p *Picklist)
 
 func PickOptRemoveButtons(b bool) PicklistOption {
@@ -54,7 +56,7 @@ func PickOptMaxInlineButtons(n int) PicklistOption {
 }
 
 // NewPicklist creates a new picklist.
-func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, next MsgHandler, opts ...PicklistOption) *Picklist {
+func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, next func(m *tb.Message), opts ...PicklistOption) *Picklist {
 	if b == nil {
 		panic("bot is required")
 	}
@@ -77,60 +79,56 @@ func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCa
 	return p
 }
 
-func (p *Picklist) Command() MsgHandler {
-	return func(m *tb.Message) {
-		if p.privateOnly && !m.Private() {
-			return
-		}
-		values, err := p.vFn(m.Sender)
-		if err != nil {
-			p.processErr(p.b, m, err)
-			return
-		}
-
-		// generate markup
-		markup := p.inlineMarkup(values)
-		// send message with markup
-		pr := Printer(m.Sender.LanguageCode, p.lang)
-		resp, err := p.b.Send(m.Sender,
-			fmt.Sprintf("%s\n\n%s", p.textFn(m.Sender), pr.Sprintf(MsgChooseVal)),
-			&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
-		)
-		if err != nil {
-			lg.Println(err)
-			return
-		}
-		_ = p.register(resp.ID)
-		p.logOutgoingMsg(resp, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
+func (p *Picklist) Handler(m *tb.Message) {
+	if p.privateOnly && !m.Private() {
+		return
 	}
+	values, err := p.vFn(m.Sender)
+	if err != nil {
+		p.processErr(p.b, m, err)
+		return
+	}
+
+	// generate markup
+	markup := p.inlineMarkup(values)
+	// send message with markup
+	pr := Printer(m.Sender.LanguageCode, p.lang)
+	resp, err := p.b.Send(m.Sender,
+		fmt.Sprintf("%s\n\n%s", p.textFn(m.Sender), pr.Sprintf(MsgChooseVal)),
+		&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
+	)
+	if err != nil {
+		lg.Println(err)
+		return
+	}
+	_ = p.register(resp.ID)
+	p.logOutgoingMsg(resp, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
 }
 
-func (p *Picklist) Callback() func(*tb.Callback) {
-	return func(cb *tb.Callback) {
-		p.logCallback(cb)
+func (p *Picklist) Callback(cb *tb.Callback) {
+	p.logCallback(cb)
 
-		var resp tb.CallbackResponse
-		err := p.cbFn(cb)
-		switch err {
-		case nil:
-			resp = tb.CallbackResponse{Text: MsgOK}
-		case ErrNoChange:
-			resp = tb.CallbackResponse{}
-		case ErrRetry:
-			p.b.Respond(cb, &tb.CallbackResponse{Text: MsgRetry, ShowAlert: true})
-			return
-		default: //err !=nil
-			p.editMsg(cb)
-			p.b.Respond(cb, &tb.CallbackResponse{Text: err.Error(), ShowAlert: true})
-			p.unregister(cb.Message.ID)
-			return
-		}
-		// edit message
+	var resp tb.CallbackResponse
+	err := p.cbFn(cb)
+	switch err {
+	case nil:
+		resp = tb.CallbackResponse{Text: MsgOK}
+	case ErrNoChange:
+		resp = tb.CallbackResponse{}
+	case ErrRetry:
+		p.b.Respond(cb, &tb.CallbackResponse{Text: MsgRetry, ShowAlert: true})
+		return
+	default: //err !=nil
 		p.editMsg(cb)
-		p.b.Respond(cb, &resp)
-		p.nextHandler(cb)
+		p.b.Respond(cb, &tb.CallbackResponse{Text: err.Error(), ShowAlert: true})
 		p.unregister(cb.Message.ID)
+		return
 	}
+	// edit message
+	p.editMsg(cb)
+	p.b.Respond(cb, &resp)
+	p.nextHandler(cb)
+	p.unregister(cb.Message.ID)
 }
 
 func (p *Picklist) editMsg(cb *tb.Callback) bool {
@@ -166,7 +164,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 }
 
 func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
-	return ButtonMarkup(p.b, values, p.maxButtons, p.Callback())
+	return ButtonMarkup(p.b, values, p.maxButtons, p.Callback)
 }
 
 func (p *Picklist) processErr(b Boter, m *tb.Message, err error) {

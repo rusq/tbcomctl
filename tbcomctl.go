@@ -31,13 +31,15 @@ type Boter interface {
 	Send(to tb.Recipient, what interface{}, options ...interface{}) (*tb.Message, error)
 	Edit(msg tb.Editable, what interface{}, options ...interface{}) (*tb.Message, error)
 	Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error
+	Notify(to tb.Recipient, action tb.ChatAction) error
 }
 
-// Standard message and Callback handlers signatures.
-type (
-	MsgHandler      func(m *tb.Message)
-	CallbackHandler func(cb *tb.Callback)
-)
+// Controller is the interface that some of the common controls implement.  Controllers can
+// be chained together
+type Controller interface {
+	Handler(m *tb.Message)
+	Next(Controller)
+}
 
 type StoredMessage struct {
 	MessageID string
@@ -102,7 +104,7 @@ type commonCtl struct {
 	b Boter
 
 	textFn TextFunc
-	next   MsgHandler
+	next   func(m *tb.Message)
 
 	privateOnly bool
 	errFn       ErrFunc
@@ -222,4 +224,28 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 	markup.Inline(organizeButtons(markup, buttons, defNumButtons)...)
 
 	return markup
+}
+
+func (c *commonCtl) Next(ctrl Controller) {
+	if ctrl != nil {
+		c.next = ctrl.Handler
+	}
+}
+
+func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) {
+	var chain Controller
+	for i := len(cc) - 1; i >= 0; i-- {
+		cc[i].Next(chain)
+		chain = cc[i]
+	}
+	first.Next(chain)
+	return first.Handler
+}
+
+func NewMiddlewareChain(final func(m *tb.Message), mw ...MiddlewareFunc) func(m *tb.Message) {
+	var handler = final
+	for i := len(mw) - 1; i >= 0; i-- {
+		handler = mw[i](handler)
+	}
+	return handler
 }

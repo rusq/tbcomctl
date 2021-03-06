@@ -31,6 +31,18 @@ type Boter interface {
 	Send(to tb.Recipient, what interface{}, options ...interface{}) (*tb.Message, error)
 	Edit(msg tb.Editable, what interface{}, options ...interface{}) (*tb.Message, error)
 	Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error
+	Notify(to tb.Recipient, action tb.ChatAction) error
+}
+
+// Controller is the interface that some of the common controls implement.  Controllers can
+// be chained together
+type Controller interface {
+	Handler(m *tb.Message)
+	Next(Controller)
+}
+
+type OnTexter interface {
+	OnTextMw(next func(m *tb.Message)) func(*tb.Message)
 }
 
 // Standard message and Callback handlers signatures.
@@ -102,7 +114,7 @@ type commonCtl struct {
 	b Boter
 
 	textFn TextFunc
-	next   MsgHandler
+	next   func(m *tb.Message)
 
 	privateOnly bool
 	errFn       ErrFunc
@@ -222,4 +234,29 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 	markup.Inline(organizeButtons(markup, buttons, defNumButtons)...)
 
 	return markup
+}
+
+func (c *commonCtl) Next(ctrl Controller) {
+	if ctrl != nil {
+		c.next = ctrl.Handler
+	}
+}
+
+func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) {
+	var chain Controller
+	for i := len(cc) - 1; i >= 0; i-- {
+		cc[i].Next(chain)
+		chain = cc[i]
+	}
+	first.Next(chain)
+	return first.Handler
+}
+
+func NewOnTextChain(final func(m *tb.Message), ot ...OnTexter) func(m *tb.Message) {
+	var chain = final
+	for i := len(ot) - 1; i >= 0; i-- {
+		chain = ot[i].OnTextMw(chain)
+
+	}
+	return chain
 }

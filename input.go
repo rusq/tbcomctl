@@ -84,6 +84,7 @@ func (e *InputError) Error() string {
 func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 	return func(m *tb.Message) {
 		if !ip.await[m.Sender.Recipient()] {
+			// not waiting for input, proceed to the next handler, if it's present.
 			if fn != nil {
 				fn(m)
 			}

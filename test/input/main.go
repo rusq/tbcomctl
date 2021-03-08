@@ -53,5 +53,5 @@ func processInput(b *tb.Bot) func(*tb.Message) error {
 }
 
 func onText(m *tb.Message) {
-	log.Println("onText is called: ")
+	log.Println("onText is called: ", m.Text)
 }

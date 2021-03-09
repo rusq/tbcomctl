@@ -110,6 +110,8 @@ type commonCtl struct {
 	errFn       ErrFunc
 
 	reqCache map[int]uuid.UUID // requests cache, maps message ID to request.
+	await    map[string]int    // await maps userID to the messageID and indicates that we're waiting for user to reply.
+	values   map[string]string // values entered, maps userID to the value
 	mu       sync.RWMutex
 
 	lang string
@@ -133,6 +135,7 @@ func (c *commonCtl) register(msgID int) uuid.UUID {
 	if c.reqCache == nil {
 		c.reqCache = make(map[int]uuid.UUID)
 	}
+
 	reqID := uuid.Must(uuid.NewUUID())
 	c.reqCache[msgID] = reqID
 	return reqID
@@ -181,6 +184,15 @@ func (c *commonCtl) logCallback(cb *tb.Callback) {
 
 	reqID, at := c.reqIDInfo(cb.Message.ID)
 	lg.Printf("%s> %s: msg sent at %s, user response in: %s, callback data: %q", reqID, Userinfo(cb.Sender), at, time.Since(at), cb.Data)
+}
+
+// logCallback logs callback data.
+func (c *commonCtl) logCallbackMsg(m *tb.Message) {
+	dlg.Printf("%s: callback msg dump: %s", Userinfo(m.Sender), Sdump(m))
+
+	outboundID := c.outboundID(m.Sender)
+	reqID, at := c.reqIDInfo(outboundID)
+	lg.Printf("%s> %s: msg sent at %s, user response in: %s, message data: %q", reqID, Userinfo(m.Sender), at, time.Since(at), m.Text)
 }
 
 // logOutgoingMsg logs the outgoing message and any additional string info passed in s.
@@ -248,4 +260,48 @@ func NewMiddlewareChain(final func(m *tb.Message), mw ...MiddlewareFunc) func(m 
 		handler = mw[i](handler)
 	}
 	return handler
+}
+
+func (c *commonCtl) Value(recipient string) (string, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.values == nil {
+		c.values = make(map[string]string)
+	}
+	v, ok := c.values[recipient]
+	return v, ok
+}
+
+func (c *commonCtl) SetValue(recipient string, value string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.values == nil {
+		c.values = make(map[string]string)
+	}
+	c.values[recipient] = value
+}
+
+//
+// waiting function
+//
+func (c *commonCtl) waitFor(r tb.Recipient, outboundID int) {
+	if c.await == nil {
+		c.await = make(map[string]int)
+	}
+	c.await[r.Recipient()] = outboundID
+}
+
+func (c *commonCtl) stopWaiting(r tb.Recipient) int {
+	outboundID := c.await[r.Recipient()]
+	c.await[r.Recipient()] = nothing
+	return outboundID
+}
+
+func (c *commonCtl) outboundID(r tb.Recipient) int {
+	return c.await[r.Recipient()]
+}
+
+func (c *commonCtl) isWaiting(r tb.Recipient) bool {
+	return c.await[r.Recipient()] != nothing
 }

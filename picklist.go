@@ -93,7 +93,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 	markup := p.inlineMarkup(values)
 	// send message with markup
 	pr := Printer(m.Sender.LanguageCode, p.lang)
-	resp, err := p.b.Send(m.Sender,
+	outbound, err := p.b.Send(m.Sender,
 		fmt.Sprintf("%s\n\n%s", p.textFn(m.Sender), pr.Sprintf(MsgChooseVal)),
 		&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
 	)
@@ -101,8 +101,8 @@ func (p *Picklist) Handler(m *tb.Message) {
 		lg.Println(err)
 		return
 	}
-	_ = p.register(resp.ID)
-	p.logOutgoingMsg(resp, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
+	_ = p.register(outbound.ID)
+	p.logOutgoingMsg(outbound, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
 }
 
 func (p *Picklist) Callback(cb *tb.Callback) {
@@ -124,6 +124,8 @@ func (p *Picklist) Callback(cb *tb.Callback) {
 		p.unregister(cb.Message.ID)
 		return
 	}
+
+	p.SetValue(cb.Sender.Recipient(), cb.Data)
 	// edit message
 	p.editMsg(cb)
 	p.b.Respond(cb, &resp)

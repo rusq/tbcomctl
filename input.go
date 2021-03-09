@@ -18,8 +18,6 @@ type Input struct {
 	// it returns the error, user will be informed about it.
 	OnTextFn MsgErrFunc
 
-	await map[string]bool
-
 	noReply bool
 }
 
@@ -53,7 +51,6 @@ func NewInput(b Boter, msgFn TextFunc, onTextFn MsgErrFunc) *Input {
 			privateOnly: false,
 		},
 		OnTextFn: onTextFn,
-		await:    make(map[string]bool),
 	}
 }
 
@@ -66,11 +63,14 @@ func (ip *Input) Handler(m *tb.Message) {
 	if !ip.noReply {
 		opts = append(opts, tb.ForceReply)
 	}
-	if _, err := ip.b.Send(m.Sender, ip.textFn(m.Sender), opts...); err != nil {
+	outbound, err := ip.b.Send(m.Sender, ip.textFn(m.Sender), opts...)
+	if err != nil {
 		lg.Println("Input.Handle:", err)
 		return
 	}
-	ip.await[m.Sender.Recipient()] = true
+	ip.waitFor(m.Sender, outbound.ID)
+	ip.register(outbound.ID)
+	ip.logOutgoingMsg(outbound)
 }
 
 type InputError struct {
@@ -81,9 +81,11 @@ func (e *InputError) Error() string {
 	return "input error: " + e.Message
 }
 
+const nothing = 0
+
 func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 	return func(m *tb.Message) {
-		if !ip.await[m.Sender.Recipient()] {
+		if !ip.isWaiting(m.Sender) {
 			// not waiting for input, proceed to the next handler, if it's present.
 			if fn != nil {
 				fn(m)
@@ -106,7 +108,10 @@ func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 			}
 		}
 
-		ip.await[m.Sender.Recipient()] = false
+		ip.SetValue(m.Sender.Recipient(), m.Text)
+
+		ip.logCallbackMsg(m)
+		ip.unregister(ip.stopWaiting(m.Sender))
 
 		if ip.next != nil && valueErr == nil {
 			// if there are chained controls

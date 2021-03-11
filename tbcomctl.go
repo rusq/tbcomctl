@@ -38,7 +38,10 @@ type Boter interface {
 // be chained together
 type Controller interface {
 	Handler(m *tb.Message)
-	Next(Controller)
+	SetNext(Controller)
+	Next() func(m *tb.Message)
+	Value(recepient string) (string, bool)
+	SetValue(recepient string, value string)
 }
 
 type StoredMessage struct {
@@ -104,7 +107,8 @@ type commonCtl struct {
 	b Boter
 
 	textFn TextFunc
-	next   func(m *tb.Message)
+
+	next func(m *tb.Message)
 
 	privateOnly bool
 	errFn       ErrFunc
@@ -238,19 +242,23 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 	return markup
 }
 
-func (c *commonCtl) Next(ctrl Controller) {
+func (c *commonCtl) SetNext(ctrl Controller) {
 	if ctrl != nil {
 		c.next = ctrl.Handler
 	}
 }
 
+func (c *commonCtl) Next() func(m *tb.Message) {
+	return c.next
+}
+
 func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) {
 	var chain Controller
 	for i := len(cc) - 1; i >= 0; i-- {
-		cc[i].Next(chain)
+		cc[i].SetNext(chain)
 		chain = cc[i]
 	}
-	first.Next(chain)
+	first.SetNext(chain)
 	return first.Handler
 }
 

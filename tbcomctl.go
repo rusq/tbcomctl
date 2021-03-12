@@ -82,7 +82,7 @@ func (m StoredMessage) MessageSig() (string, int64) {
 type ValuesFunc func(ctx context.Context, u *tb.User) ([]string, error)
 
 // TextFunc returns formatted text, possibly personalised for user u.
-type TextFunc func(ctx context.Context, u *tb.User) string
+type TextFunc func(ctx context.Context, u *tb.User) (string, error)
 
 type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
 

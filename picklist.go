@@ -76,8 +76,15 @@ func NewPicklist(b Boter, name string, textFn TextFunc, valuesFn ValuesFunc, cal
 	return p
 }
 
-func NewPicklistText(b Boter, name string, text string, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
-	return NewPicklist(b, name, func(context.Context, *tb.User) string { return text }, valuesFn, callbackFn, opts...)
+// NewPicklistText is a convenience function to return picklist with fixed text and values.
+func NewPicklistText(b Boter, name string, text string, values []string, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
+	return NewPicklist(b,
+		name,
+		func(context.Context, *tb.User) (string, error) { return text, nil },
+		func(ctx context.Context, u *tb.User) ([]string, error) { return values, nil },
+		callbackFn,
+		opts...,
+	)
 }
 
 func (p *Picklist) Handler(m *tb.Message) {
@@ -95,8 +102,14 @@ func (p *Picklist) Handler(m *tb.Message) {
 	markup := p.inlineMarkup(values)
 	// send message with markup
 	pr := Printer(m.Sender.LanguageCode, p.lang)
+	text, err := p.textFn(WithController(context.Background(), p), m.Sender)
+	if err != nil {
+		lg.Printf("error while generating text for controller: %s: %s", p.name, err)
+		p.b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
+		return
+	}
 	outbound, err := p.b.Send(m.Sender,
-		fmt.Sprintf("%s\n\n%s", p.textFn(WithController(context.Background(), p), m.Sender), pr.Sprintf(MsgChooseVal)),
+		fmt.Sprintf("%s\n\n%s", text, pr.Sprintf(MsgChooseVal)),
 		&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
 	)
 	if err != nil {
@@ -136,10 +149,16 @@ func (p *Picklist) Callback(cb *tb.Callback) {
 }
 
 func (p *Picklist) editMsg(cb *tb.Callback) bool {
+	text, err := p.textFn(WithController(context.Background(), p), cb.Sender)
+	if err != nil {
+		lg.Println(err)
+		return false
+	}
+
 	if p.removeButtons {
 		if _, err := p.b.Edit(
 			cb.Message,
-			p.textFn(WithController(context.Background(), p), cb.Sender),
+			text,
 			&tb.SendOptions{ParseMode: tb.ModeHTML},
 		); err != nil {
 			lg.Println(err)
@@ -157,7 +176,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 
 	markup := p.inlineMarkup(values)
 	if _, err := p.b.Edit(cb.Message,
-		fmt.Sprintf("%s\n\n%s", p.textFn(WithController(context.Background(), p), cb.Sender), pr.Sprintf(MsgChooseVal)),
+		fmt.Sprintf("%s\n\n%s", text, pr.Sprintf(MsgChooseVal)),
 		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
 	); err != nil {
 		lg.Println(err)

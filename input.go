@@ -62,7 +62,7 @@ func NewInput(b Boter, name string, textFn TextFunc, onTextFn MsgErrFunc, opts .
 }
 
 func NewInputText(b Boter, name string, txt string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
-	return NewInput(b, name, func(context.Context, *tb.User) string { return txt }, onTextFn, opts...)
+	return NewInput(b, name, func(context.Context, *tb.User) (string, error) { return txt, nil }, onTextFn, opts...)
 }
 
 func (ip *Input) Handler(m *tb.Message) {
@@ -70,7 +70,14 @@ func (ip *Input) Handler(m *tb.Message) {
 	if !ip.noReply {
 		opts = append(opts, tb.ForceReply)
 	}
-	outbound, err := ip.b.Send(m.Sender, ip.textFn(WithController(context.Background(), ip), m.Sender), opts...)
+	pr := Printer(m.Sender.LanguageCode)
+	text, err := ip.textFn(WithController(context.Background(), ip), m.Sender)
+	if err != nil {
+		lg.Printf("error while generating text for controller: %s: %s", ip.name, err)
+		ip.b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
+		return
+	}
+	outbound, err := ip.b.Send(m.Sender, text, opts...)
 	if err != nil {
 		lg.Println("Input.Handle:", err)
 		return

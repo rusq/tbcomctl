@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -37,8 +36,21 @@ type Boter interface {
 // Controller is the interface that some of the common controls implement.  Controllers can
 // be chained together
 type Controller interface {
+	// Handler is the controller's message handler.
 	Handler(m *tb.Message)
-	Next(Controller)
+	// Name returns the name of the control assigned to it on creation.  When
+	// Controller is a part of a form, one can call Form.Controller(name) method
+	// to get the controller.
+	Name() string
+	// SetNext sets the next handler, when control is part of a form.
+	SetNext(Controller)
+	// SetPrev sets the previous handler.
+	SetPrev(Controller)
+	// SetForm assigns the form to the controller, this will allow controller to
+	// address other controls in a form by name.
+	SetForm(*Form)
+	// Value returns the value stored in the controller for the recipient.
+	Value(recipient string) (string, bool)
 }
 
 type StoredMessage struct {
@@ -103,11 +115,15 @@ func optFallbackLang(lang string) option {
 type commonCtl struct {
 	b Boter
 
+	name string // name of the control, must be unique if used within chained controls
+	prev Controller
+	next Controller
+	form *Form // if not nil, controller is part of the form.
+
 	textFn TextFunc
-	next   func(m *tb.Message)
+	errFn  ErrFunc
 
 	privateOnly bool
-	errFn       ErrFunc
 
 	reqCache map[int]uuid.UUID // requests cache, maps message ID to request.
 	await    map[string]int    // await maps userID to the messageID and indicates that we're waiting for user to reply.
@@ -178,31 +194,6 @@ func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.R
 	return rows
 }
 
-// logCallback logs callback data.
-func (c *commonCtl) logCallback(cb *tb.Callback) {
-	dlg.Printf("%s: callback dump: %s", Userinfo(cb.Sender), Sdump(cb))
-
-	reqID, at := c.reqIDInfo(cb.Message.ID)
-	lg.Printf("%s> %s: msg sent at %s, user response in: %s, callback data: %q", reqID, Userinfo(cb.Sender), at, time.Since(at), cb.Data)
-}
-
-// logCallback logs callback data.
-func (c *commonCtl) logCallbackMsg(m *tb.Message) {
-	dlg.Printf("%s: callback msg dump: %s", Userinfo(m.Sender), Sdump(m))
-
-	outboundID := c.outboundID(m.Sender)
-	reqID, at := c.reqIDInfo(outboundID)
-	lg.Printf("%s> %s: msg sent at %s, user response in: %s, message data: %q", reqID, Userinfo(m.Sender), at, time.Since(at), m.Text)
-}
-
-// logOutgoingMsg logs the outgoing message and any additional string info passed in s.
-func (c *commonCtl) logOutgoingMsg(m *tb.Message, s ...string) {
-	dlg.Printf("%s: message dump: %s", Userinfo(m.Sender), Sdump(m))
-
-	reqID, at := c.reqIDInfo(m.ID)
-	lg.Printf("%s> msg to chat: %s, req time: %s: %s", reqID, ChatInfo(m.Chat), at, strings.Join(s, " "))
-}
-
 // reqIDInfo returns a request ID (or <unknown) and a time of the request (or zero time).
 func (c *commonCtl) reqIDInfo(msgID int) (string, time.Time) {
 	reqID, ok := c.requestFor(msgID)
@@ -238,30 +229,31 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 	return markup
 }
 
-func (c *commonCtl) Next(ctrl Controller) {
+// SetNext sets next controller in the chain.
+func (c *commonCtl) SetNext(ctrl Controller) {
 	if ctrl != nil {
-		c.next = ctrl.Handler
+		c.next = ctrl
+	}
+}
+
+// SetPrev sets the previous controller in the chain.
+func (c *commonCtl) SetPrev(ctrl Controller) {
+	if ctrl != nil {
+		c.prev = ctrl
 	}
 }
 
 func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) {
 	var chain Controller
 	for i := len(cc) - 1; i >= 0; i-- {
-		cc[i].Next(chain)
+		cc[i].SetNext(chain)
 		chain = cc[i]
 	}
-	first.Next(chain)
+	first.SetNext(chain)
 	return first.Handler
 }
 
-func NewMiddlewareChain(final func(m *tb.Message), mw ...MiddlewareFunc) func(m *tb.Message) {
-	var handler = final
-	for i := len(mw) - 1; i >= 0; i-- {
-		handler = mw[i](handler)
-	}
-	return handler
-}
-
+// Value returns the Controller value for the recipient.
 func (c *commonCtl) Value(recipient string) (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -273,6 +265,7 @@ func (c *commonCtl) Value(recipient string) (string, bool) {
 	return v, ok
 }
 
+// SetValue sets the Controller value.
 func (c *commonCtl) SetValue(recipient string, value string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -304,4 +297,12 @@ func (c *commonCtl) outboundID(r tb.Recipient) int {
 
 func (c *commonCtl) isWaiting(r tb.Recipient) bool {
 	return c.await[r.Recipient()] != nothing
+}
+
+func (c *commonCtl) Name() string {
+	return c.name
+}
+
+func (c *commonCtl) SetForm(fm *Form) {
+	c.form = fm
 }

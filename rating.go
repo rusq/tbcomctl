@@ -9,7 +9,7 @@ import (
 	tb "gopkg.in/tucnak/telebot.v2"
 )
 
-// Rating is a customizable struct for attaching post rating.
+// Rating is a struct for attaching post rating.
 type Rating struct {
 	commonCtl
 

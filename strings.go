@@ -5,6 +5,8 @@ import (
 	"golang.org/x/text/message"
 )
 
+const defLang = "en-US"
+
 func Nvlstring(s string, ss ...string) string {
 	if s != "" {
 		return s
@@ -23,7 +25,7 @@ func Printer(lang string, fallback ...string) *message.Printer {
 		if len(fallback) > 0 && fallback[0] != "" {
 			tag = language.MustParse(fallback[0])
 		} else {
-			tag = language.MustParse("en-US")
+			tag = language.MustParse(defLang)
 		}
 	}
 	return message.NewPrinter(tag)

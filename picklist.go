@@ -56,7 +56,7 @@ func PickOptMaxInlineButtons(n int) PicklistOption {
 }
 
 // NewPicklist creates a new picklist.
-func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, next func(m *tb.Message), opts ...PicklistOption) *Picklist {
+func NewPicklist(b Boter, name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
 	if b == nil {
 		panic("bot is required")
 	}
@@ -67,7 +67,6 @@ func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCa
 		commonCtl: &commonCtl{
 			b:      b,
 			textFn: textFn,
-			next:   next,
 		},
 		vFn:     valuesFn,
 		cbFn:    callbackFn,
@@ -105,8 +104,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 	p.logOutgoingMsg(outbound, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
 }
 
-// callback is the callback function for the picklist.
-func (p *Picklist) callback(cb *tb.Callback) {
+func (p *Picklist) Callback(cb *tb.Callback) {
 	p.logCallback(cb)
 
 	var resp tb.CallbackResponse
@@ -167,7 +165,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 }
 
 func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
-	return ButtonMarkup(p.b, values, p.maxButtons, p.callback)
+	return ButtonMarkup(p.b, values, p.maxButtons, p.Callback)
 }
 
 func (p *Picklist) processErr(b Boter, m *tb.Message, err error) {
@@ -190,6 +188,6 @@ func callbackToMesg(cb *tb.Callback) *tb.Message {
 func (p *Picklist) nextHandler(cb *tb.Callback) {
 	if p.next != nil {
 		// this call is part of the pipeline
-		p.next(callbackToMesg(cb))
+		p.next.Handler(callbackToMesg(cb))
 	}
 }

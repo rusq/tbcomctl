@@ -36,6 +36,12 @@ func IOptNoReply(b bool) InputOption {
 	}
 }
 
+func IOptPrivateOnly(b bool) InputOption {
+	return func(ip *Input) {
+		optPrivateOnly(b)(&ip.commonCtl)
+	}
+}
+
 // NewInput text creates a new text input, optionally chaining with the `next`
 // handler. One must use Handle as a handler for bot endpoint, and then hook the
 // OnText to OnTextMw.  msgFn is the function that should produce the text that
@@ -43,19 +49,24 @@ func IOptNoReply(b bool) InputOption {
 // input.  It should return an error if the user input is not accepted, and then
 // user is offered to retry.  It can format the return error with fmt.Errorf, as
 // this is what user will see.  next is allowed to be nil.
-func NewInput(b Boter, msgFn TextFunc, onTextFn MsgErrFunc) *Input {
-	return &Input{
+func NewInput(b Boter, name string, msgFn TextFunc, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+	ip := &Input{
 		commonCtl: commonCtl{
 			b:           b,
+			name:        name,
 			textFn:      msgFn,
 			privateOnly: false,
 		},
 		OnTextFn: onTextFn,
 	}
+	for _, opt := range opts {
+		opt(ip)
+	}
+	return ip
 }
 
-func NewInputText(b Boter, txt string, onTextFn MsgErrFunc) *Input {
-	return NewInput(b, func(u *tb.User) string { return txt }, onTextFn)
+func NewInputText(b Boter, name string, txt string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+	return NewInput(b, name, func(u *tb.User) string { return txt }, onTextFn, opts...)
 }
 
 func (ip *Input) Handler(m *tb.Message) {
@@ -115,10 +126,7 @@ func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 
 		if ip.next != nil && valueErr == nil {
 			// if there are chained controls
-			ip.next(m)
-		} else {
-			// run the initial handler
-			fn(m)
+			ip.next.Handler(m)
 		}
 	}
 }

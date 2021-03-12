@@ -56,7 +56,7 @@ func PickOptMaxInlineButtons(n int) PicklistOption {
 }
 
 // NewPicklist creates a new picklist.
-func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, next func(m *tb.Message), opts ...PicklistOption) *Picklist {
+func NewPicklist(b Boter, name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
 	if b == nil {
 		panic("bot is required")
 	}
@@ -67,7 +67,6 @@ func NewPicklist(b Boter, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCa
 		commonCtl: &commonCtl{
 			b:      b,
 			textFn: textFn,
-			next:   next,
 		},
 		vFn:     valuesFn,
 		cbFn:    callbackFn,
@@ -189,6 +188,6 @@ func callbackToMesg(cb *tb.Callback) *tb.Message {
 func (p *Picklist) nextHandler(cb *tb.Callback) {
 	if p.next != nil {
 		// this call is part of the pipeline
-		p.next(callbackToMesg(cb))
+		p.next.Handler(callbackToMesg(cb))
 	}
 }

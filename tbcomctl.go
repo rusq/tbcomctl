@@ -39,6 +39,11 @@ type Boter interface {
 type Controller interface {
 	Handler(m *tb.Message)
 	Next(Controller)
+	Name() string
+	SetPrev(Controller)
+	// set form assigns the form to the controller, this will allow controller to
+	// address other controls in a form by name.
+	SetForm(*Form)
 }
 
 type StoredMessage struct {
@@ -103,11 +108,15 @@ func optFallbackLang(lang string) option {
 type commonCtl struct {
 	b Boter
 
+	name string // name of the control, must be unique if used within chained controls
+	prev Controller
+	next Controller
+	form *Form // if not nil, controller is part of the form.
+
 	textFn TextFunc
-	next   func(m *tb.Message)
+	errFn  ErrFunc
 
 	privateOnly bool
-	errFn       ErrFunc
 
 	reqCache map[int]uuid.UUID // requests cache, maps message ID to request.
 	await    map[string]int    // await maps userID to the messageID and indicates that we're waiting for user to reply.
@@ -238,9 +247,17 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 	return markup
 }
 
+// Next sets next controller in the chain.
 func (c *commonCtl) Next(ctrl Controller) {
 	if ctrl != nil {
-		c.next = ctrl.Handler
+		c.next = ctrl
+	}
+}
+
+// SetPrev sets the previous controller in the chain.
+func (c *commonCtl) SetPrev(ctrl Controller) {
+	if ctrl != nil {
+		c.prev = ctrl
 	}
 }
 
@@ -304,4 +321,12 @@ func (c *commonCtl) outboundID(r tb.Recipient) int {
 
 func (c *commonCtl) isWaiting(r tb.Recipient) bool {
 	return c.await[r.Recipient()] != nothing
+}
+
+func (c *commonCtl) Name() string {
+	return c.name
+}
+
+func (c *commonCtl) SetForm(fm *Form) {
+	c.form = fm
 }

@@ -14,7 +14,7 @@ const (
 )
 
 type Picklist struct {
-	*commonCtl
+	commonCtl
 	*buttons
 	removeButtons bool
 
@@ -34,19 +34,19 @@ func PickOptRemoveButtons(b bool) PicklistOption {
 
 func PickOptPrivateOnly(b bool) PicklistOption {
 	return func(p *Picklist) {
-		optPrivateOnly(b)(p.commonCtl)
+		optPrivateOnly(b)(&p.commonCtl)
 	}
 }
 
 func PickOptErrFunc(fn ErrFunc) PicklistOption {
 	return func(p *Picklist) {
-		optErrFunc(fn)(p.commonCtl)
+		optErrFunc(fn)(&p.commonCtl)
 	}
 }
 
 func PickOptFallbackLang(lang string) PicklistOption {
 	return func(p *Picklist) {
-		optFallbackLang(lang)(p.commonCtl)
+		optFallbackLang(lang)(&p.commonCtl)
 	}
 }
 
@@ -65,18 +65,19 @@ func NewPicklist(b Boter, name string, textFn TextFunc, valuesFn ValuesFunc, cal
 		panic("one or more of the functions not set")
 	}
 	p := &Picklist{
-		commonCtl: &commonCtl{
-			b:      b,
-			textFn: textFn,
-		},
-		vFn:     valuesFn,
-		cbFn:    callbackFn,
-		buttons: &buttons{maxButtons: defNumButtons},
+		commonCtl: newCommonCtl(b, name, textFn),
+		vFn:       valuesFn,
+		cbFn:      callbackFn,
+		buttons:   &buttons{maxButtons: defNumButtons},
 	}
 	for _, opt := range opts {
 		opt(p)
 	}
 	return p
+}
+
+func NewPicklistText(b Boter, name string, text string, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
+	return NewPicklist(b, name, func(context.Context, *tb.User) string { return text }, valuesFn, callbackFn, opts...)
 }
 
 func (p *Picklist) Handler(m *tb.Message) {

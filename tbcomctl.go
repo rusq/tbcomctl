@@ -149,6 +149,14 @@ type commonCtl struct {
 	lang string
 }
 
+func newCommonCtl(b Boter, name string, textFn TextFunc) commonCtl {
+	return commonCtl{
+		b:      b,
+		name:   name,
+		textFn: textFn,
+	}
+}
+
 // PrivateOnly is the middleware that restricts the handler to only private
 // messages.
 func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {

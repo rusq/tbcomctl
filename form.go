@@ -89,3 +89,12 @@ func (fm *Form) Data(r tb.Recipient) map[string]string {
 	}
 	return data
 }
+
+// Value returns the form control value for recipient by name
+func (fm *Form) Value(ctrlName, recipient string) (string, bool) {
+	ctrl, ok := fm.cm[ctrlName]
+	if !ok {
+		return "", false
+	}
+	return ctrl.Value(recipient)
+}

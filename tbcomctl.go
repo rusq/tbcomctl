@@ -38,10 +38,7 @@ type Boter interface {
 // be chained together
 type Controller interface {
 	Handler(m *tb.Message)
-	SetNext(Controller)
-	Next() func(m *tb.Message)
-	Value(recepient string) (string, bool)
-	SetValue(recepient string, value string)
+	Next(Controller)
 }
 
 type StoredMessage struct {
@@ -60,6 +57,8 @@ type ValuesFunc func(u *tb.User) ([]string, error)
 type TextFunc func(u *tb.User) string
 
 type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
+
+type ErrFunc func(m *tb.Message, err error)
 
 // BtnCallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
 // ErrRetry if the retry should be performed.
@@ -88,6 +87,12 @@ func optPrivateOnly(b bool) option {
 	}
 }
 
+func optErrFunc(fn ErrFunc) option {
+	return func(ctl *commonCtl) {
+		ctl.errFn = fn
+	}
+}
+
 func optFallbackLang(lang string) option {
 	return func(ctl *commonCtl) {
 		_ = language.MustParse(lang) // will panic if wrong.
@@ -99,8 +104,7 @@ type commonCtl struct {
 	b Boter
 
 	textFn TextFunc
-
-	next func(m *tb.Message)
+	next   func(m *tb.Message)
 
 	privateOnly bool
 	errFn       ErrFunc
@@ -234,23 +238,19 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 	return markup
 }
 
-func (c *commonCtl) SetNext(ctrl Controller) {
+func (c *commonCtl) Next(ctrl Controller) {
 	if ctrl != nil {
 		c.next = ctrl.Handler
 	}
 }
 
-func (c *commonCtl) Next() func(m *tb.Message) {
-	return c.next
-}
-
 func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) {
 	var chain Controller
 	for i := len(cc) - 1; i >= 0; i-- {
-		cc[i].SetNext(chain)
+		cc[i].Next(chain)
 		chain = cc[i]
 	}
-	first.SetNext(chain)
+	first.Next(chain)
 	return first.Handler
 }
 

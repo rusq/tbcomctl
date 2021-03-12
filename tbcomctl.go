@@ -3,6 +3,7 @@
 package tbcomctl
 
 import (
+	"context"
 	"crypto/sha1"
 	"errors"
 	"fmt"
@@ -49,8 +50,23 @@ type Controller interface {
 	// SetForm assigns the form to the controller, this will allow controller to
 	// address other controls in a form by name.
 	SetForm(*Form)
+	// Form returns the form associated with the controller.
+	Form() *Form
 	// Value returns the value stored in the controller for the recipient.
 	Value(recipient string) (string, bool)
+}
+
+type controllerKey int
+
+var ctrlKey controllerKey
+
+func WithController(ctx context.Context, ctrl Controller) context.Context {
+	return context.WithValue(ctx, ctrlKey, ctrl)
+}
+
+func ControllerFromCtx(ctx context.Context) (Controller, bool) {
+	ctrl, ok := ctx.Value(ctrlKey).(Controller)
+	return ctrl, ok
 }
 
 type StoredMessage struct {
@@ -63,18 +79,18 @@ func (m StoredMessage) MessageSig() (string, int64) {
 }
 
 // TextFunc returns values for inline buttons, possibly personalised for user u.
-type ValuesFunc func(u *tb.User) ([]string, error)
+type ValuesFunc func(ctx context.Context, u *tb.User) ([]string, error)
 
 // TextFunc returns formatted text, possibly personalised for user u.
-type TextFunc func(u *tb.User) string
+type TextFunc func(ctx context.Context, u *tb.User) string
 
 type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
 
-type ErrFunc func(m *tb.Message, err error)
+type ErrFunc func(ctx context.Context, m *tb.Message, err error)
 
 // BtnCallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
 // ErrRetry if the retry should be performed.
-type BtnCallbackFunc func(cb *tb.Callback) error
+type BtnCallbackFunc func(ctx context.Context, cb *tb.Callback) error
 
 var (
 	// ErrRetry should be returned by CallbackFunc if the retry should be performed.
@@ -305,4 +321,8 @@ func (c *commonCtl) Name() string {
 
 func (c *commonCtl) SetForm(fm *Form) {
 	c.form = fm
+}
+
+func (c *commonCtl) Form() *Form {
+	return c.form
 }

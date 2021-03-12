@@ -1,6 +1,7 @@
 package tbcomctl
 
 import (
+	"context"
 	"time"
 
 	tb "gopkg.in/tucnak/telebot.v2"
@@ -26,7 +27,7 @@ var _ Controller = &Input{}
 // MsgErrFunc is the function that processes the user input.  If the input is
 // invalid, it should return InputError with the message, then the user is
 // offered to retry the input.
-type MsgErrFunc func(m *tb.Message) error
+type MsgErrFunc func(ctx context.Context, m *tb.Message) error
 
 type InputOption func(*Input)
 
@@ -66,7 +67,7 @@ func NewInput(b Boter, name string, msgFn TextFunc, onTextFn MsgErrFunc, opts ..
 }
 
 func NewInputText(b Boter, name string, txt string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
-	return NewInput(b, name, func(u *tb.User) string { return txt }, onTextFn, opts...)
+	return NewInput(b, name, func(context.Context, *tb.User) string { return txt }, onTextFn, opts...)
 }
 
 func (ip *Input) Handler(m *tb.Message) {
@@ -74,7 +75,7 @@ func (ip *Input) Handler(m *tb.Message) {
 	if !ip.noReply {
 		opts = append(opts, tb.ForceReply)
 	}
-	outbound, err := ip.b.Send(m.Sender, ip.textFn(m.Sender), opts...)
+	outbound, err := ip.b.Send(m.Sender, ip.textFn(WithController(context.Background(), ip), m.Sender), opts...)
 	if err != nil {
 		lg.Println("Input.Handle:", err)
 		return
@@ -104,7 +105,7 @@ func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 			return
 		}
 
-		valueErr := ip.OnTextFn(m)
+		valueErr := ip.OnTextFn(WithController(context.Background(), ip), m)
 		if valueErr != nil {
 			// wrong input or some other problem
 			lg.Println(valueErr)

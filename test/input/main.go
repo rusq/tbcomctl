@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -36,13 +37,15 @@ func main() {
 	b.Handle("/input", handler)
 	b.Handle("/form", form.Handler)
 	// b.Handle(tb.OnText, tbcomctl.NewMiddlewareChain(onText, nameIp.OnTextMw, ageIp.OnTextMw))
-	b.Handle(tb.OnText, form.OnTextMiddleware(onText))
+	b.Handle(tb.OnText, form.OnTextMiddleware(func(m *tb.Message) {
+		log.Printf("onText is called: %q\nuser data: %v", m.Text, form.Data(m.Sender))
+	}))
 
 	b.Start()
 }
 
-func processInput(b *tb.Bot) func(*tb.Message) error {
-	return func(m *tb.Message) error {
+func processInput(b *tb.Bot) func(context.Context, *tb.Message) error {
+	return func(ctx context.Context, m *tb.Message) error {
 		val := m.Text
 		log.Println("msgCb function is called, input value:", val)
 		switch val {
@@ -50,6 +53,9 @@ func processInput(b *tb.Bot) func(*tb.Message) error {
 			return fmt.Errorf("error requested: %s", val)
 		case "wrong":
 			return &tbcomctl.InputError{Message: "wrong input"}
+		}
+		if ctrl, ok := tbcomctl.ControllerFromCtx(ctx); ok {
+			log.Println("form values so far: ", ctrl.Form().Data(m.Sender))
 		}
 		return nil
 	}

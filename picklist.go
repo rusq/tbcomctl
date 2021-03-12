@@ -1,6 +1,7 @@
 package tbcomctl
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -82,9 +83,10 @@ func (p *Picklist) Handler(m *tb.Message) {
 	if p.privateOnly && !m.Private() {
 		return
 	}
-	values, err := p.vFn(m.Sender)
+	ctrlCtx := WithController(context.Background(), p)
+	values, err := p.vFn(ctrlCtx, m.Sender)
 	if err != nil {
-		p.processErr(p.b, m, err)
+		p.processErr(m, err)
 		return
 	}
 
@@ -93,7 +95,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 	// send message with markup
 	pr := Printer(m.Sender.LanguageCode, p.lang)
 	outbound, err := p.b.Send(m.Sender,
-		fmt.Sprintf("%s\n\n%s", p.textFn(m.Sender), pr.Sprintf(MsgChooseVal)),
+		fmt.Sprintf("%s\n\n%s", p.textFn(WithController(context.Background(), p), m.Sender), pr.Sprintf(MsgChooseVal)),
 		&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
 	)
 	if err != nil {
@@ -108,7 +110,7 @@ func (p *Picklist) Callback(cb *tb.Callback) {
 	p.logCallback(cb)
 
 	var resp tb.CallbackResponse
-	err := p.cbFn(cb)
+	err := p.cbFn(WithController(context.Background(), p), cb)
 	switch err {
 	case nil:
 		resp = tb.CallbackResponse{Text: MsgOK}
@@ -136,7 +138,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 	if p.removeButtons {
 		if _, err := p.b.Edit(
 			cb.Message,
-			p.textFn(cb.Sender),
+			p.textFn(WithController(context.Background(), p), cb.Sender),
 			&tb.SendOptions{ParseMode: tb.ModeHTML},
 		); err != nil {
 			lg.Println(err)
@@ -146,15 +148,15 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 	}
 
 	pr := Printer(cb.Sender.LanguageCode, p.lang)
-	values, err := p.vFn(cb.Sender)
+	values, err := p.vFn(WithController(context.Background(), p), cb.Sender)
 	if err != nil {
-		p.processErr(p.b, callbackToMesg(cb), err)
+		p.processErr(convertToMsg(cb), err)
 		return false
 	}
 
 	markup := p.inlineMarkup(values)
 	if _, err := p.b.Edit(cb.Message,
-		fmt.Sprintf("%s\n\n%s", p.textFn(cb.Sender), pr.Sprintf(MsgChooseVal)),
+		fmt.Sprintf("%s\n\n%s", p.textFn(WithController(context.Background(), p), cb.Sender), pr.Sprintf(MsgChooseVal)),
 		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
 	); err != nil {
 		lg.Println(err)
@@ -168,18 +170,18 @@ func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
 	return ButtonMarkup(p.b, values, p.maxButtons, p.Callback)
 }
 
-func (p *Picklist) processErr(b Boter, m *tb.Message, err error) {
+func (p *Picklist) processErr(m *tb.Message, err error) {
 	pr := Printer(m.Sender.LanguageCode, p.lang)
 	lg.Println(err)
 	if p.errFn == nil {
-		b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
+		p.b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
 	} else {
 		lg.Println("calling error message handler")
-		p.errFn(m, err)
+		p.errFn(WithController(context.Background(), p), m, err)
 	}
 }
 
-func callbackToMesg(cb *tb.Callback) *tb.Message {
+func convertToMsg(cb *tb.Callback) *tb.Message {
 	msg := cb.Message
 	msg.Sender = cb.Sender
 	return msg
@@ -188,6 +190,6 @@ func callbackToMesg(cb *tb.Callback) *tb.Message {
 func (p *Picklist) nextHandler(cb *tb.Callback) {
 	if p.next != nil {
 		// this call is part of the pipeline
-		p.next.Handler(callbackToMesg(cb))
+		p.next.Handler(convertToMsg(cb))
 	}
 }

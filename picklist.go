@@ -105,7 +105,8 @@ func (p *Picklist) Handler(m *tb.Message) {
 	p.logOutgoingMsg(outbound, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
 }
 
-func (p *Picklist) Callback(cb *tb.Callback) {
+// callback is the callback function for the picklist.
+func (p *Picklist) callback(cb *tb.Callback) {
 	p.logCallback(cb)
 
 	var resp tb.CallbackResponse
@@ -166,7 +167,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 }
 
 func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
-	return ButtonMarkup(p.b, values, p.maxButtons, p.Callback)
+	return ButtonMarkup(p.b, values, p.maxButtons, p.callback)
 }
 
 func (p *Picklist) processErr(b Boter, m *tb.Message, err error) {

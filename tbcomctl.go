@@ -61,8 +61,6 @@ type TextFunc func(u *tb.User) string
 
 type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
 
-type ErrFunc func(m *tb.Message, err error)
-
 // BtnCallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
 // ErrRetry if the retry should be performed.
 type BtnCallbackFunc func(cb *tb.Callback) error
@@ -87,12 +85,6 @@ type option func(ctl *commonCtl)
 func optPrivateOnly(b bool) option {
 	return func(ctl *commonCtl) {
 		ctl.privateOnly = b
-	}
-}
-
-func optErrFunc(fn ErrFunc) option {
-	return func(ctl *commonCtl) {
-		ctl.errFn = fn
 	}
 }
 

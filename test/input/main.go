@@ -35,7 +35,8 @@ func main() {
 
 	b.Handle("/input", handler)
 	b.Handle("/form", form.Handler)
-	b.Handle(tb.OnText, tbcomctl.NewMiddlewareChain(onText, nameIp.OnTextMw, ageIp.OnTextMw))
+	// b.Handle(tb.OnText, tbcomctl.NewMiddlewareChain(onText, nameIp.OnTextMw, ageIp.OnTextMw))
+	b.Handle(tb.OnText, form.OnTextMiddleware(onText))
 
 	b.Start()
 }

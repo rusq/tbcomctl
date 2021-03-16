@@ -56,6 +56,24 @@ type Controller interface {
 	Value(recipient string) (string, bool)
 }
 
+// PrivateOnly is the middleware that restricts the handler to only private
+// messages.
+func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {
+	return PrivateWithMsg(nil, "", fn)
+}
+
+func PrivateWithMsg(b Boter, msg string, fn func(m *tb.Message)) func(*tb.Message) {
+	return func(m *tb.Message) {
+		if !m.Private() {
+			if !(b == nil || msg == "") {
+				b.Send(m.Chat, msg)
+			}
+			return
+		}
+		fn(m)
+	}
+}
+
 type controllerKey int
 
 var ctrlKey controllerKey
@@ -154,17 +172,6 @@ func newCommonCtl(b Boter, name string, textFn TextFunc) commonCtl {
 		b:      b,
 		name:   name,
 		textFn: textFn,
-	}
-}
-
-// PrivateOnly is the middleware that restricts the handler to only private
-// messages.
-func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {
-	return func(m *tb.Message) {
-		if !m.Private() {
-			return
-		}
-		fn(m)
 	}
 }
 

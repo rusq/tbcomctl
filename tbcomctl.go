@@ -342,3 +342,10 @@ func (c *commonCtl) SetForm(fm *Form) {
 func (c *commonCtl) Form() *Form {
 	return c.form
 }
+
+// TextFn wraps the message in a TextFunc.
+func TextFn(msg string) TextFunc {
+	return func(ctx context.Context, u *tb.User) (string, error) {
+		return msg, nil
+	}
+}

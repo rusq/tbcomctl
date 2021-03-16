@@ -80,7 +80,7 @@ func NewPicklist(b Boter, name string, textFn TextFunc, valuesFn ValuesFunc, cal
 func NewPicklistText(b Boter, name string, text string, values []string, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
 	return NewPicklist(b,
 		name,
-		func(context.Context, *tb.User) (string, error) { return text, nil },
+		TextFn(text),
 		func(ctx context.Context, u *tb.User) ([]string, error) { return values, nil },
 		callbackFn,
 		opts...,

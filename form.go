@@ -9,17 +9,13 @@ type Form struct {
 	cm    map[string]Controller
 }
 
-func NewForm(first Controller, rest ...Controller) *Form {
-	if first == nil {
+func NewForm(ctrls ...Controller) *Form {
+	if len(ctrls) == 0 {
 		panic("creating form with no controllers")
 	}
-	fm := new(Form)
-	// populate controllers
-	fm.ctrls = []Controller{
-		first,
+	fm := &Form{
+		ctrls: ctrls,
 	}
-	fm.ctrls = append(fm.ctrls, rest...)
-
 	// name->controller map
 	fm.cm = make(map[string]Controller, len(fm.ctrls))
 

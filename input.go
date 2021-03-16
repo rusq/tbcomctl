@@ -61,8 +61,8 @@ func NewInput(b Boter, name string, textFn TextFunc, onTextFn MsgErrFunc, opts .
 	return ip
 }
 
-func NewInputText(b Boter, name string, txt string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
-	return NewInput(b, name, func(context.Context, *tb.User) (string, error) { return txt, nil }, onTextFn, opts...)
+func NewInputText(b Boter, name string, text string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+	return NewInput(b, name, TextFn(text), onTextFn, opts...)
 }
 
 func (ip *Input) Handler(m *tb.Message) {

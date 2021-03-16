@@ -59,14 +59,15 @@ type Controller interface {
 // PrivateOnly is the middleware that restricts the handler to only private
 // messages.
 func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {
-	return PrivateWithMsg(nil, "", fn)
+	return PrivateOnlyMsg(nil, "", fn)
 }
 
-func PrivateWithMsg(b Boter, msg string, fn func(m *tb.Message)) func(*tb.Message) {
+func PrivateOnlyMsg(b Boter, msg string, fn func(m *tb.Message)) func(*tb.Message) {
 	return func(m *tb.Message) {
 		if !m.Private() {
 			if !(b == nil || msg == "") {
-				b.Send(m.Chat, msg)
+				pr := Printer(m.Sender.LanguageCode)
+				b.Send(m.Chat, pr.Sprintf(msg))
 			}
 			return
 		}

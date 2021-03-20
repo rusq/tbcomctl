@@ -5,7 +5,6 @@ package tbcomctl
 import (
 	"context"
 	"crypto/sha1"
-	"errors"
 	"fmt"
 	"strconv"
 	"sync"
@@ -31,6 +30,16 @@ type Boter interface {
 	Send(to tb.Recipient, what interface{}, options ...interface{}) (*tb.Message, error)
 	Edit(msg tb.Editable, what interface{}, options ...interface{}) (*tb.Message, error)
 	Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error
+}
+
+type BotChecker interface {
+	Boter
+	ChatMemberOf(chat *tb.Chat, user *tb.User) (*tb.ChatMember, error)
+	ChatByID(id string) (*tb.Chat, error)
+}
+
+type BotNotifier interface {
+	Boter
 	Notify(to tb.Recipient, action tb.ChatAction) error
 }
 
@@ -111,11 +120,27 @@ type ErrFunc func(ctx context.Context, m *tb.Message, err error)
 // ErrRetry if the retry should be performed.
 type BtnCallbackFunc func(ctx context.Context, cb *tb.Callback) error
 
+type ErrType int
+
+const (
+	TErrNoChange ErrType = iota
+	TErrRetry
+	TInputError
+)
+
+type Error struct {
+	Alert bool
+	Msg   string
+	Type  ErrType
+}
+
+func (e *Error) Error() string { return e.Msg }
+
 var (
 	// ErrRetry should be returned by CallbackFunc if the retry should be performed.
-	ErrRetry = errors.New("retry")
+	ErrRetry = &Error{Type: TErrRetry, Msg: "retry", Alert: true}
 	// ErrNoChange should be returned if the user picked the same value as before, and no update needed.
-	ErrNoChange = errors.New("no change")
+	ErrNoChange = &Error{Type: TErrNoChange, Msg: "no change"}
 )
 
 var hasher = sha1.New

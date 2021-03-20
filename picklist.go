@@ -16,7 +16,10 @@ const (
 type Picklist struct {
 	commonCtl
 	*buttons
+
 	removeButtons bool
+	noUpdate      bool
+	msgChoose     bool
 
 	vFn  ValuesFunc
 	cbFn BtnCallbackFunc
@@ -26,9 +29,19 @@ var _ Controller = &Picklist{}
 
 type PicklistOption func(p *Picklist)
 
+// PickOptRemoveButtons set the Remove Buttons option.  If Remove Buttons is
+// set, the inline buttons will be removed once the user make the choice.
 func PickOptRemoveButtons(b bool) PicklistOption {
 	return func(p *Picklist) {
 		p.removeButtons = b
+	}
+}
+
+// PickOptNoUpdate sets the No Update option.  If No Update is set, the text is
+// not updated once the user makes their choice.
+func PickOptNoUpdate(b bool) PicklistOption {
+	return func(p *Picklist) {
+		p.noUpdate = b
 	}
 }
 
@@ -109,7 +122,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 		return
 	}
 	outbound, err := p.b.Send(m.Sender,
-		fmt.Sprintf("%s\n\n%s", text, pr.Sprintf(MsgChooseVal)),
+		p.format(m.Sender, text),
 		&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
 	)
 	if err != nil {
@@ -125,20 +138,26 @@ func (p *Picklist) Callback(cb *tb.Callback) {
 
 	var resp tb.CallbackResponse
 	err := p.cbFn(WithController(context.Background(), p), cb)
-	switch err {
-	case nil:
+	if err != nil {
+		if e, ok := err.(*Error); !ok {
+			p.editMsg(cb)
+			p.b.Respond(cb, &tb.CallbackResponse{Text: err.Error(), ShowAlert: true})
+			p.unregister(cb.Message.ID)
+			return
+		} else {
+			switch e.Type {
+			case TErrNoChange:
+				resp = tb.CallbackResponse{}
+			case TErrRetry:
+				p.b.Respond(cb, &tb.CallbackResponse{Text: e.Msg, ShowAlert: e.Alert})
+				return
+			default:
+				p.b.Respond(cb, &tb.CallbackResponse{Text: e.Msg, ShowAlert: e.Alert})
+			}
+		}
+	} else { // err == nil
 		resp = tb.CallbackResponse{Text: MsgOK}
-	case ErrNoChange:
-		resp = tb.CallbackResponse{}
-	case ErrRetry:
-		p.b.Respond(cb, &tb.CallbackResponse{Text: MsgRetry, ShowAlert: true})
-		return
-	default: //err !=nil
-		p.editMsg(cb)
-		p.b.Respond(cb, &tb.CallbackResponse{Text: err.Error(), ShowAlert: true})
-		p.unregister(cb.Message.ID)
-		return
-	}
+	} // if err != nil
 
 	p.SetValue(cb.Sender.Recipient(), cb.Data)
 	// edit message
@@ -166,8 +185,10 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 		}
 		return true
 	}
+	if p.noUpdate {
+		return true
+	}
 
-	pr := Printer(cb.Sender.LanguageCode, p.lang)
 	values, err := p.vFn(WithController(context.Background(), p), cb.Sender)
 	if err != nil {
 		p.processErr(convertToMsg(cb), err)
@@ -176,7 +197,7 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 
 	markup := p.inlineMarkup(values)
 	if _, err := p.b.Edit(cb.Message,
-		fmt.Sprintf("%s\n\n%s", text, pr.Sprintf(MsgChooseVal)),
+		p.format(cb.Sender, text),
 		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
 	); err != nil {
 		lg.Println(err)
@@ -184,6 +205,14 @@ func (p *Picklist) editMsg(cb *tb.Callback) bool {
 	}
 
 	return true
+}
+
+func (p *Picklist) format(u *tb.User, text string) string {
+	if p.msgChoose {
+		pr := Printer(u.LanguageCode, p.lang)
+		text = pr.Sprintf("%s\n\n%s", text, pr.Sprintf(MsgChooseVal))
+	}
+	return text
 }
 
 func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
@@ -196,7 +225,7 @@ func (p *Picklist) processErr(m *tb.Message, err error) {
 	if p.errFn == nil {
 		p.b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
 	} else {
-		lg.Println("calling error message handler")
+		dlg.Println("calling error message handler")
 		p.errFn(WithController(context.Background(), p), m, err)
 	}
 }

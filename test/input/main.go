@@ -52,15 +52,11 @@ func processInput(b *tb.Bot) func(context.Context, *tb.Message) error {
 		case "error":
 			return fmt.Errorf("error requested: %s", val)
 		case "wrong":
-			return &tbcomctl.InputError{Message: "wrong input"}
+			return tbcomctl.NewInputError("wrong input")
 		}
 		if ctrl, ok := tbcomctl.ControllerFromCtx(ctx); ok {
 			log.Println("form values so far: ", ctrl.Form().Data(m.Sender))
 		}
 		return nil
 	}
-}
-
-func onText(m *tb.Message) {
-	log.Println("onText is called: ", m.Text)
 }

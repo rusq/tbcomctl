@@ -50,7 +50,7 @@ func IOptPrivateOnly(b bool) InputOption {
 // input.  It should return an error if the user input is not accepted, and then
 // user is offered to retry.  It can format the return error with fmt.Errorf, as
 // this is what user will see.  next is allowed to be nil.
-func NewInput(b Boter, name string, textFn TextFunc, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+func NewInput(b BotNotifier, name string, textFn TextFunc, onTextFn MsgErrFunc, opts ...InputOption) *Input {
 	ip := &Input{
 		commonCtl: newCommonCtl(b, name, textFn),
 		OnTextFn:  onTextFn,
@@ -61,7 +61,7 @@ func NewInput(b Boter, name string, textFn TextFunc, onTextFn MsgErrFunc, opts .
 	return ip
 }
 
-func NewInputText(b Boter, name string, text string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+func NewInputText(b BotNotifier, name string, text string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
 	return NewInput(b, name, TextFn(text), onTextFn, opts...)
 }
 
@@ -87,16 +87,15 @@ func (ip *Input) Handler(m *tb.Message) {
 	ip.logOutgoingMsg(outbound)
 }
 
-type InputError struct {
-	Message string
-}
-
-func (e *InputError) Error() string {
-	return "input error: " + e.Message
+// NewInputError returns an input error with msg.
+func NewInputError(msg string) error {
+	return &Error{Msg: msg, Type: TInputError}
 }
 
 const nothing = 0
 
+// OnTextMw returns the middleware that should wrap the OnText handler. It will
+// process the message only if control awaits for this particular user input.
 func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 	return func(m *tb.Message) {
 		if !ip.isWaiting(m.Sender) {
@@ -111,8 +110,8 @@ func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 		if valueErr != nil {
 			// wrong input or some other problem
 			lg.Println(valueErr)
-			if e, ok := valueErr.(*InputError); ok {
-				ip.processError(m, e.Message)
+			if e, ok := valueErr.(*Error); ok {
+				ip.processError(m, e.Msg)
 				return
 			} else {
 				if _, err := ip.b.Send(m.Sender, MsgUnexpected); err != nil {
@@ -138,9 +137,8 @@ func (ip *Input) processError(m *tb.Message, errmsg string) {
 	if _, err := ip.b.Send(m.Sender, errmsg); err != nil {
 		return
 	}
-	if err := ip.b.Notify(m.Sender, tb.Typing); err != nil {
-		lg.Println(err)
-		return
+	if b, ok := ip.b.(BotNotifier); ok {
+		b.Notify(m.Sender, tb.Typing)
 	}
 	time.Sleep(retryDelay)
 	ip.Handler(m)

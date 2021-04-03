@@ -83,7 +83,7 @@ func (ip *Input) Handler(m *tb.Message) {
 		return
 	}
 	ip.waitFor(m.Sender, outbound.ID)
-	ip.register(outbound.ID)
+	ip.register(m.Sender, outbound.ID)
 	ip.logOutgoingMsg(outbound)
 }
 
@@ -124,7 +124,7 @@ func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
 		ip.SetValue(m.Sender.Recipient(), m.Text)
 
 		ip.logCallbackMsg(m)
-		ip.unregister(ip.stopWaiting(m.Sender))
+		ip.unregister(m.Sender, ip.stopWaiting(m.Sender))
 
 		if ip.next != nil && valueErr == nil {
 			// if there are chained controls

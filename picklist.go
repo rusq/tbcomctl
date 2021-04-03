@@ -121,6 +121,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 		p.b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
 		return
 	}
+	// if overwrite is true and prev is not nil - edit, otherwise - send.
 	outbound, err := p.b.Send(m.Sender,
 		p.format(m.Sender, text),
 		&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
@@ -129,7 +130,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 		lg.Println(err)
 		return
 	}
-	_ = p.register(outbound.ID)
+	_ = p.register(m.Sender, outbound.ID)
 	p.logOutgoingMsg(outbound, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
 }
 
@@ -142,7 +143,7 @@ func (p *Picklist) Callback(cb *tb.Callback) {
 		if e, ok := err.(*Error); !ok {
 			p.editMsg(cb)
 			p.b.Respond(cb, &tb.CallbackResponse{Text: err.Error(), ShowAlert: true})
-			p.unregister(cb.Message.ID)
+			p.unregister(cb.Sender, cb.Message.ID)
 			return
 		} else {
 			switch e.Type {
@@ -164,7 +165,7 @@ func (p *Picklist) Callback(cb *tb.Callback) {
 	p.editMsg(cb)
 	p.b.Respond(cb, &resp)
 	p.nextHandler(cb)
-	p.unregister(cb.Message.ID)
+	p.unregister(cb.Sender, cb.Message.ID)
 }
 
 func (p *Picklist) editMsg(cb *tb.Callback) bool {

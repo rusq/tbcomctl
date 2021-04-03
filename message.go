@@ -38,8 +38,11 @@ func (m *Message) Handler(msg *tb.Message) {
 		return
 	}
 
-	if _, err = m.b.Send(msg.Chat, txt, m.opts...); err != nil {
+	outbound, err := m.sendOrEdit(msg, txt, m.opts...)
+	if err != nil {
 		lg.Printf("tbcomctl: message: send error: %s: %s", Userinfo(msg.Sender), err)
 		return
 	}
+	m.register(msg.Sender, outbound.ID)
+	m.unregister(msg.Sender, outbound.ID)
 }

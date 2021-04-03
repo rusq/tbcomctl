@@ -38,6 +38,27 @@ func NewForm(ctrls ...Controller) *Form {
 	return fm
 }
 
+// SetOverwrite sets the overwrite flag on all controllers within the form.
+func (fm *Form) SetOverwrite(b bool) *Form {
+	for _, c := range fm.ctrls {
+		if p, ok := c.(overwriter); ok {
+			p.setOverwrite(b)
+		}
+	}
+	return fm
+}
+
+// SetRemoveButtons sets the remove buttons flag on all controllers within the
+// form.
+func (fm *Form) SetRemoveButtons(b bool) *Form {
+	for _, c := range fm.ctrls {
+		if p, ok := c.(*Picklist); ok {
+			p.removeButtons = b
+		}
+	}
+	return fm
+}
+
 func (fm *Form) Handler(m *tb.Message) {
 	fm.ctrls[0].Handler(m)
 }

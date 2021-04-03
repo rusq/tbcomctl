@@ -6,24 +6,23 @@ import (
 )
 
 const (
-	MsgUnexpected  = "Unexpected error occurred."
+	MsgUnexpected  = "🤯 (500) Unexpected error occurred."
 	MsgRetry       = "Incorrect choice."
 	MsgChooseVal   = "Choose value from the list:"
-	MsgOK          = "OK."
-	MsgVoteCounted = "Vote counted."
-	MsgSubCheck    = "Check subscription >>"
-	MsgSubNoSub    = "You're not subscribed to one or more of the required channels."
+	MsgOK          = "✅"
+	MsgVoteCounted = "✅ Vote counted."
+	MsgSubCheck    = "？ Check subscription >>"
+	MsgSubNoSub    = "❌ You're not subscribed to one or more of the required channels."
 )
 
 var translations = map[language.Tag][]i18nmsg{
 	language.Russian: {
-		{MsgUnexpected, "Произошло недоразумение."},
+		{MsgUnexpected, "🤯 (500) Произошло недоразумение."},
 		{MsgRetry, "Неверный выбор"},
-		{MsgChooseVal, "Сделайте выбор из списка:"},
-		{MsgOK, "OK."},
-		{MsgVoteCounted, "Голос учтен."},
-		{MsgSubCheck, "Проверить подписку >>"},
-		{MsgSubNoSub, "Вы не подписались на один или более необходимых каналов."},
+		{MsgChooseVal, "Выберите из списка:"},
+		{MsgVoteCounted, "✅ Голос учтен."},
+		{MsgSubCheck, "？ Проверить подписку >>"},
+		{MsgSubNoSub, "❌ Вы не подписались на один или более необходимых каналов."},
 	},
 }
 

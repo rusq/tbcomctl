@@ -37,6 +37,12 @@ func PickOptRemoveButtons(b bool) PicklistOption {
 	}
 }
 
+func PickOptOverwrite(b bool) PicklistOption {
+	return func(p *Picklist) {
+		p.overwrite = b
+	}
+}
+
 // PickOptNoUpdate sets the No Update option.  If No Update is set, the text is
 // not updated once the user makes their choice.
 func PickOptNoUpdate(b bool) PicklistOption {
@@ -122,10 +128,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 		return
 	}
 	// if overwrite is true and prev is not nil - edit, otherwise - send.
-	outbound, err := p.b.Send(m.Sender,
-		p.format(m.Sender, text),
-		&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
-	)
+	outbound, err := p.sendOrEdit(m, text, &tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML})
 	if err != nil {
 		lg.Println(err)
 		return

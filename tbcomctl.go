@@ -65,6 +65,28 @@ type Controller interface {
 	Value(recipient string) (string, bool)
 }
 
+type commonCtl struct {
+	b Boter
+
+	name string // name of the control, must be unique if used within chained controls
+	prev Controller
+	next Controller
+	form *Form // if not nil, controller is part of the form.
+
+	textFn TextFunc
+	errFn  ErrFunc
+
+	privateOnly bool
+
+	reqCache map[string]map[int]uuid.UUID // requests cache, maps message ID to request.
+	await    map[string]int               // await maps userID to the messageID and indicates that we're waiting for user to reply.
+	values   map[string]string            // values entered, maps userID to the value
+	// messages map[string]int    // messages sent, maps userID to the message_id
+	mu sync.RWMutex
+
+	lang string
+}
+
 // PrivateOnly is the middleware that restricts the handler to only private
 // messages.
 func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {
@@ -172,27 +194,7 @@ func optFallbackLang(lang string) option {
 	}
 }
 
-type commonCtl struct {
-	b Boter
-
-	name string // name of the control, must be unique if used within chained controls
-	prev Controller
-	next Controller
-	form *Form // if not nil, controller is part of the form.
-
-	textFn TextFunc
-	errFn  ErrFunc
-
-	privateOnly bool
-
-	reqCache map[int]uuid.UUID // requests cache, maps message ID to request.
-	await    map[string]int    // await maps userID to the messageID and indicates that we're waiting for user to reply.
-	values   map[string]string // values entered, maps userID to the value
-	mu       sync.RWMutex
-
-	lang string
-}
-
+// newCommonCtl creates a new commonctl instance.
 func newCommonCtl(b Boter, name string, textFn TextFunc) commonCtl {
 	return commonCtl{
 		b:      b,
@@ -202,34 +204,41 @@ func newCommonCtl(b Boter, name string, textFn TextFunc) commonCtl {
 }
 
 // register registers message in cache assigning it a request id.
-func (c *commonCtl) register(msgID int) uuid.UUID {
+func (c *commonCtl) register(r tb.Recipient, msgID int) uuid.UUID {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.reqCache == nil {
-		c.reqCache = make(map[int]uuid.UUID)
-	}
+
+	c.requestEnsure(r)
 
 	reqID := uuid.Must(uuid.NewUUID())
-	c.reqCache[msgID] = reqID
+	c.reqCache[r.Recipient()][msgID] = reqID
 	return reqID
+}
+
+// requestEnsure initialises that request cache is initialised.
+func (c *commonCtl) requestEnsure(r tb.Recipient) {
+	if c.reqCache == nil {
+		c.reqCache = make(map[string]map[int]uuid.UUID)
+	}
+	if c.reqCache[r.Recipient()] == nil {
+		c.reqCache[r.Recipient()] = make(map[int]uuid.UUID)
+	}
 }
 
 // requestFor returns a request id for message ID and a bool. Bool will be true if
 // message is registered and false otherwise.
-func (c *commonCtl) requestFor(msgID int) (uuid.UUID, bool) {
+func (c *commonCtl) requestFor(r tb.Recipient, msgID int) (uuid.UUID, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.reqCache == nil {
-		return uuid.UUID{}, false
-	}
-	reqID, ok := c.reqCache[msgID]
+	c.requestEnsure(r)
+	reqID, ok := c.reqCache[r.Recipient()][msgID]
 	return reqID, ok
 }
 
-func (c *commonCtl) unregister(msgID int) {
+func (c *commonCtl) unregister(r tb.Recipient, msgID int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	delete(c.reqCache, msgID)
+	delete(c.reqCache[r.Recipient()], msgID)
 }
 
 // organizeButtons organizes buttons in rows.
@@ -252,8 +261,8 @@ func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.R
 }
 
 // reqIDInfo returns a request ID (or <unknown) and a time of the request (or zero time).
-func (c *commonCtl) reqIDInfo(msgID int) (string, time.Time) {
-	reqID, ok := c.requestFor(msgID)
+func (c *commonCtl) reqIDInfo(r tb.Recipient, msgID int) (string, time.Time) {
+	reqID, ok := c.requestFor(r, msgID)
 	if !ok {
 		return unknown, time.Time{}
 	}
@@ -335,6 +344,9 @@ func (c *commonCtl) SetValue(recipient string, value string) {
 //
 // waiting function
 //
+
+// waitFor places the outbound message ID to the waiting list.  Message ID in
+// outbound waiting list means that we expect the user to respond.
 func (c *commonCtl) waitFor(r tb.Recipient, outboundID int) {
 	if c.await == nil {
 		c.await = make(map[string]int)

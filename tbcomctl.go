@@ -416,7 +416,7 @@ func (c *commonCtl) sendOrEdit(userMsg *tb.Message, txt string, sendOpts ...inte
 	if c.overwrite && c.prev != nil {
 		msgID, ok := c.prev.OutgoingID(userMsg.Sender.Recipient())
 		if !ok {
-			return nil, fmt.Errorf("can't find previous message ID for %s", Userinfo(userMsg.Sender))
+			return nil, fmt.Errorf("%s can't find previous message ID for %s", caller(2), Userinfo(userMsg.Sender))
 
 		}
 		prevMsg := tb.Message{ID: msgID, Chat: userMsg.Chat}

@@ -63,6 +63,13 @@ type Controller interface {
 	Form() *Form
 	// Value returns the value stored in the controller for the recipient.
 	Value(recipient string) (string, bool)
+	// OutgoingID should return the value of the outgoing message ID for the
+	// user and true if the message is present or false otherwise.
+	OutgoingID(recipient string) (int, bool)
+}
+
+type overwriter interface {
+	setOverwrite(b bool)
 }
 
 type commonCtl struct {
@@ -77,12 +84,13 @@ type commonCtl struct {
 	errFn  ErrFunc
 
 	privateOnly bool
+	overwrite   bool // overwrite the previous message sent by control.
 
 	reqCache map[string]map[int]uuid.UUID // requests cache, maps message ID to request.
 	await    map[string]int               // await maps userID to the messageID and indicates that we're waiting for user to reply.
 	values   map[string]string            // values entered, maps userID to the value
-	// messages map[string]int    // messages sent, maps userID to the message_id
-	mu sync.RWMutex
+	messages map[string]int               // messages sent, maps userID to the message_id
+	mu       sync.RWMutex
 
 	lang string
 }
@@ -197,9 +205,10 @@ func optFallbackLang(lang string) option {
 // newCommonCtl creates a new commonctl instance.
 func newCommonCtl(b Boter, name string, textFn TextFunc) commonCtl {
 	return commonCtl{
-		b:      b,
-		name:   name,
-		textFn: textFn,
+		b:        b,
+		name:     name,
+		textFn:   textFn,
+		messages: make(map[string]int),
 	}
 }
 
@@ -212,6 +221,7 @@ func (c *commonCtl) register(r tb.Recipient, msgID int) uuid.UUID {
 
 	reqID := uuid.Must(uuid.NewUUID())
 	c.reqCache[r.Recipient()][msgID] = reqID
+	c.messages[r.Recipient()] = msgID
 	return reqID
 }
 
@@ -380,9 +390,22 @@ func (c *commonCtl) Form() *Form {
 	return c.form
 }
 
+// OutgoingID returns the controller's outgoing message ID for the user.
+func (c *commonCtl) OutgoingID(recipient string) (int, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	id, ok := c.messages[recipient]
+	return id, ok
+}
+
 // TextFn wraps the message in a TextFunc.
 func TextFn(msg string) TextFunc {
 	return func(ctx context.Context, u *tb.User) (string, error) {
 		return msg, nil
 	}
+}
+
+func (c *commonCtl) setOverwrite(b bool) {
+	c.overwrite = b
 }

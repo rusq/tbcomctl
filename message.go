@@ -38,21 +38,7 @@ func (m *Message) Handler(msg *tb.Message) {
 		return
 	}
 
-	var outbound *tb.Message
-	if m.overwrite && m.prev != nil {
-		msgID, ok := m.prev.OutgoingID(msg.Sender.Recipient())
-		if !ok {
-			lg.Println("can't find previous message ID for %s", Userinfo(msg.Sender))
-			return
-		}
-		prevMsg := tb.Message{ID: msgID, Chat: msg.Chat}
-		outbound, err = m.b.Edit(&prevMsg,
-			txt,
-			m.opts...,
-		)
-	} else {
-		outbound, err = m.b.Send(msg.Chat, txt, m.opts...)
-	}
+	outbound, err := m.sendOrEdit(msg, txt, m.opts...)
 	if err != nil {
 		lg.Printf("tbcomctl: message: send error: %s: %s", Userinfo(msg.Sender), err)
 		return

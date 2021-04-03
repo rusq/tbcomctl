@@ -128,24 +128,7 @@ func (p *Picklist) Handler(m *tb.Message) {
 		return
 	}
 	// if overwrite is true and prev is not nil - edit, otherwise - send.
-	var outbound *tb.Message
-	if p.overwrite && p.prev != nil {
-		msgID, ok := p.prev.OutgoingID(m.Sender.Recipient())
-		if !ok {
-			lg.Println("can't find previous message ID for %s", Userinfo(m.Sender))
-			return
-		}
-		prevMsg := tb.Message{ID: msgID, Chat: m.Chat}
-		outbound, err = p.b.Edit(&prevMsg,
-			p.format(m.Sender, text),
-			&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
-		)
-	} else {
-		outbound, err = p.b.Send(m.Sender,
-			p.format(m.Sender, text),
-			&tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML},
-		)
-	}
+	outbound, err := p.sendOrEdit(m, text, &tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML})
 	if err != nil {
 		lg.Println(err)
 		return

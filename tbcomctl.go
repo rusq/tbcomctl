@@ -409,3 +409,23 @@ func TextFn(msg string) TextFunc {
 func (c *commonCtl) setOverwrite(b bool) {
 	c.overwrite = b
 }
+
+func (c *commonCtl) sendOrEdit(userMsg *tb.Message, txt string, sendOpts ...interface{}) (*tb.Message, error) {
+	var outbound *tb.Message
+	var err error
+	if c.overwrite && c.prev != nil {
+		msgID, ok := c.prev.OutgoingID(userMsg.Sender.Recipient())
+		if !ok {
+			return nil, fmt.Errorf("can't find previous message ID for %s", Userinfo(userMsg.Sender))
+
+		}
+		prevMsg := tb.Message{ID: msgID, Chat: userMsg.Chat}
+		outbound, err = c.b.Edit(&prevMsg,
+			txt,
+			sendOpts...,
+		)
+	} else {
+		outbound, err = c.b.Send(userMsg.Chat, txt, sendOpts...)
+	}
+	return outbound, err
+}

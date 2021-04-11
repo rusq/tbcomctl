@@ -41,11 +41,12 @@ func main() {
 		b,
 		"2",
 		"second picklist",
-		[]string{"4", "5", "6"},
+		[]string{"5", "6", "7", "8"},
 		func(ctx context.Context, cb *tb.Callback) error {
 			fmt.Println(tbcomctl.Sdump(cb))
 			return nil
 		},
+		tbcomctl.PickOptBtnPattern([]uint{1, 2, 1}),
 	)
 	m := tbcomctl.NewMessageText(b, "msg", "all ok")
 	form := tbcomctl.NewForm(p1, p2, m).

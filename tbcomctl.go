@@ -264,7 +264,7 @@ func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.R
 		}
 		buttons = append(buttons, btn)
 	}
-	if 0 < len(buttons) && len(buttons) < btnInRow {
+	if 0 < len(buttons) && len(buttons) <= btnInRow {
 		rows = append(rows, buttons)
 	}
 	return rows

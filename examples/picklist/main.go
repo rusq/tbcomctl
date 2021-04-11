@@ -31,7 +31,7 @@ func main() {
 		b,
 		"1",
 		"first picklist",
-		[]string{"1", "2", "3"},
+		[]string{"1", "2", "3", "4"},
 		func(ctx context.Context, cb *tb.Callback) error {
 			fmt.Println(tbcomctl.Sdump(cb))
 			return nil

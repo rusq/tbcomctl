@@ -66,3 +66,22 @@ func ButtonMarkup(b Boter, values []string, maxRowButtons int, cbFn func(*tb.Cal
 	selector.Inline(organizeButtons(selector, btns, maxRowButtons)...)
 	return selector
 }
+
+// organizeButtons organizes buttons in rows.
+func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.Row {
+	var rows []tb.Row
+	var buttons []tb.Btn
+	for i, btn := range btns {
+		if i%btnInRow == 0 {
+			if len(buttons) > 0 {
+				rows = append(rows, markup.Row(buttons...))
+			}
+			buttons = make([]tb.Btn, 0, btnInRow)
+		}
+		buttons = append(buttons, btn)
+	}
+	if 0 < len(buttons) && len(buttons) <= btnInRow {
+		rows = append(rows, buttons)
+	}
+	return rows
+}

@@ -251,25 +251,6 @@ func (c *commonCtl) unregister(r tb.Recipient, msgID int) {
 	delete(c.reqCache[r.Recipient()], msgID)
 }
 
-// organizeButtons organizes buttons in rows.
-func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.Row {
-	var rows []tb.Row
-	var buttons []tb.Btn
-	for i, btn := range btns {
-		if i%btnInRow == 0 {
-			if len(buttons) > 0 {
-				rows = append(rows, markup.Row(buttons...))
-			}
-			buttons = make([]tb.Btn, 0, btnInRow)
-		}
-		buttons = append(buttons, btn)
-	}
-	if 0 < len(buttons) && len(buttons) <= btnInRow {
-		rows = append(rows, buttons)
-	}
-	return rows
-}
-
 // reqIDInfo returns a request ID (or <unknown) and a time of the request (or zero time).
 func (c *commonCtl) reqIDInfo(r tb.Recipient, msgID int) (string, time.Time) {
 	reqID, ok := c.requestFor(r, msgID)

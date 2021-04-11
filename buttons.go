@@ -48,9 +48,15 @@ func NewPostButtons(b Boter, callbackFn func(cb *tb.Callback), opts ...PBOption)
 }
 
 // Markup returns the markup with buttons labeled with labels.
-func (pb *PostButtons) Markup(labels []string) *tb.ReplyMarkup {
-	return ButtonMarkup(pb.b, labels, pb.maxButtons, pb.cbFn)
-
+func (pb *PostButtons) Markup(labels []string, pattern ...uint) (*tb.ReplyMarkup, error) {
+	if len(pattern) == 0 {
+		return ButtonMarkup(pb.b, labels, pb.maxButtons, pb.cbFn), nil
+	}
+	markup, err := ButtonPatternMarkup(pb.b, labels, pattern, pb.cbFn)
+	if err != nil {
+		panic(err)
+	}
+	return markup, nil
 }
 
 // ButtonMarkup returns the button markup for the message.  It creates handlers
@@ -60,16 +66,30 @@ func ButtonMarkup(b Boter, values []string, maxRowButtons int, cbFn func(*tb.Cal
 	if maxRowButtons <= 0 || defNumButtons < maxRowButtons {
 		maxRowButtons = defNumButtons
 	}
-	selector := new(tb.ReplyMarkup)
+	markup, btns := createButtons(b, values, cbFn)
+	markup.Inline(organizeButtons(btns, maxRowButtons)...)
+	return markup
+}
+
+func ButtonPatternMarkup(b Boter, values []string, pattern []uint, cbFn func(*tb.Callback)) (*tb.ReplyMarkup, error) {
+	markup, btns := createButtons(b, values, cbFn)
+	rows, err := organizeButtonsPattern(btns, pattern)
+	if err != nil {
+		return nil, err
+	}
+	markup.Inline(rows...)
+	return markup, nil
+}
+
+func createButtons(b Boter, values []string, cbFn func(*tb.Callback)) (*tb.ReplyMarkup, []tb.Btn) {
+	markup := new(tb.ReplyMarkup)
 	var btns []tb.Btn
 	for _, label := range values {
-		btn := selector.Data(label, hash(label), label)
+		btn := markup.Data(label, hash(label), label)
 		btns = append(btns, btn)
 		b.Handle(&btn, cbFn)
 	}
-
-	selector.Inline(organizeButtons(btns, maxRowButtons)...)
-	return selector
+	return markup, btns
 }
 
 // organizeButtons organizes buttons in rows, at most btnInRow per row.

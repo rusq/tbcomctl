@@ -23,6 +23,8 @@ type Picklist struct {
 
 	vFn  ValuesFunc
 	cbFn BtnCallbackFunc
+
+	btnPattern []uint
 }
 
 var _ Controller = &Picklist{}
@@ -72,6 +74,30 @@ func PickOptFallbackLang(lang string) PicklistOption {
 func PickOptMaxInlineButtons(n int) PicklistOption {
 	return func(p *Picklist) {
 		p.buttons.SetMaxButtons(n)
+	}
+}
+
+// PickOptBtnPattern sets the inline markup button pattern.
+// Each unsigned integer in the pattern represents the number
+// of buttons shown on each of the rows.
+//
+// Example:
+//
+//   pattern: []uint{1, 2, 3}
+//   will produce the following markup for the picklist choices
+//
+//   +-------------------+
+//   | Picklist text     |
+//   +-------------------+
+//   |     button 1      |
+//   +---------+---------+
+//   | button 2| button 3|
+//   +------+--+---+-----+
+//   | btn4 | btn5 | btn6|
+//   +------+------+-----+
+func PickOptBtnPattern(pattern []uint) PicklistOption {
+	return func(p *Picklist) {
+		p.btnPattern = pattern
 	}
 }
 
@@ -220,7 +246,14 @@ func (p *Picklist) format(u *tb.User, text string) string {
 }
 
 func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
-	return ButtonMarkup(p.b, values, p.maxButtons, p.Callback)
+	if len(p.btnPattern) == 0 {
+		return ButtonMarkup(p.b, values, p.maxButtons, p.Callback)
+	}
+	m, err := ButtonPatternMarkup(p.b, values, p.btnPattern, p.Callback)
+	if err != nil {
+		panic(err) // TODO handle this more gracefully.
+	}
+	return m
 }
 
 func (p *Picklist) processErr(m *tb.Message, err error) {

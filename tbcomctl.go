@@ -281,7 +281,7 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 		c.b.Handle(&bn, cbFn)
 	}
 
-	markup.Inline(organizeButtons(markup, buttons, defNumButtons)...)
+	markup.Inline(organizeButtons(buttons, defNumButtons)...)
 
 	return markup
 }

@@ -32,7 +32,7 @@ func (k *Keyboard) Markup(lang string) *tb.ReplyMarkup {
 		btns = append(btns, btn)
 		k.b.Handle(&btn, h)
 	}
-	m.Reply(organizeButtons(m, btns, k.btnsInRow)...)
+	m.Reply(organizeButtons(btns, k.btnsInRow)...)
 	return m
 }
 

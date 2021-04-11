@@ -1,6 +1,11 @@
 package tbcomctl
 
-import tb "gopkg.in/tucnak/telebot.v2"
+import (
+	"errors"
+	"fmt"
+
+	tb "gopkg.in/tucnak/telebot.v2"
+)
 
 type buttons struct {
 	maxButtons int
@@ -63,18 +68,18 @@ func ButtonMarkup(b Boter, values []string, maxRowButtons int, cbFn func(*tb.Cal
 		b.Handle(&btn, cbFn)
 	}
 
-	selector.Inline(organizeButtons(selector, btns, maxRowButtons)...)
+	selector.Inline(organizeButtons(btns, maxRowButtons)...)
 	return selector
 }
 
-// organizeButtons organizes buttons in rows.
-func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.Row {
+// organizeButtons organizes buttons in rows, at most btnInRow per row.
+func organizeButtons(btns []tb.Btn, btnInRow int) []tb.Row {
 	var rows []tb.Row
 	var buttons []tb.Btn
 	for i, btn := range btns {
 		if i%btnInRow == 0 {
 			if len(buttons) > 0 {
-				rows = append(rows, markup.Row(buttons...))
+				rows = append(rows, buttons)
 			}
 			buttons = make([]tb.Btn, 0, btnInRow)
 		}
@@ -84,4 +89,36 @@ func organizeButtons(markup *tb.ReplyMarkup, btns []tb.Btn, btnInRow int) []tb.R
 		rows = append(rows, buttons)
 	}
 	return rows
+}
+
+func organizeButtonsPattern(btns []tb.Btn, pattern []uint) ([]tb.Row, error) {
+	if len(btns) == 0 {
+		return nil, errors.New("no buttons to organize")
+	}
+	// check total number, must not exceed sum of buttons in pattern
+	sum := 0
+	for i, perRow := range pattern {
+		if perRow < 1 {
+			return nil, fmt.Errorf("patterns can't have < 1 buttons in a row (row index: %d)", i)
+		}
+		sum += int(perRow)
+	}
+	if sum < len(btns) {
+		return nil, fmt.Errorf("can't fit %d buttons in this pattern: %v", len(btns), pattern)
+	}
+
+	var rows []tb.Row
+	var offset uint = 0
+	for _, perRow := range pattern {
+		var row tb.Row
+		if offset >= uint(len(btns)) {
+			break
+		}
+		for i := offset; i-offset < perRow; i++ {
+			row = append(row, btns[i])
+		}
+		rows = append(rows, row)
+		offset += uint(len(row))
+	}
+	return rows, nil
 }

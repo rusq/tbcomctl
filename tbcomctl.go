@@ -63,6 +63,8 @@ type Controller interface {
 	Form() *Form
 	// Value returns the value stored in the controller for the recipient.
 	Value(recipient string) (string, bool)
+	// Bot returns the bot that is used to inialise the controller.
+	Bot() Boter
 	// OutgoingID should return the value of the outgoing message ID for the
 	// user and true if the message is present or false otherwise.
 	OutgoingID(recipient string) (int, bool)
@@ -409,4 +411,8 @@ func (c *commonCtl) sendOrEdit(userMsg *tb.Message, txt string, sendOpts ...inte
 		outbound, err = c.b.Send(userMsg.Chat, txt, sendOpts...)
 	}
 	return outbound, err
+}
+
+func (c *commonCtl) Bot() Boter {
+	return c.b
 }

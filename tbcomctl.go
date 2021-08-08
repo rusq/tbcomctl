@@ -341,6 +341,9 @@ func (c *commonCtl) SetValue(recipient string, value string) {
 // waitFor places the outbound message ID to the waiting list.  Message ID in
 // outbound waiting list means that we expect the user to respond.
 func (c *commonCtl) waitFor(r tb.Recipient, outboundID int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	if c.await == nil {
 		c.await = make(map[string]int)
 	}
@@ -354,10 +357,14 @@ func (c *commonCtl) stopWaiting(r tb.Recipient) int {
 }
 
 func (c *commonCtl) outboundID(r tb.Recipient) int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.await[r.Recipient()]
 }
 
 func (c *commonCtl) isWaiting(r tb.Recipient) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.await[r.Recipient()] != nothing
 }
 

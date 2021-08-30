@@ -20,7 +20,12 @@ type Keyboard struct {
 	btnsInRow int
 }
 
-type KeyboardCommands map[BtnLabel]func(m *tb.Message)
+type KeyboardCmd struct {
+	Label   BtnLabel
+	Handler func(m *tb.Message)
+}
+
+type KeyboardCommands []KeyboardCmd
 
 func NewKeyboard(b Boter, cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
 	kbd := &Keyboard{
@@ -40,10 +45,10 @@ func (k *Keyboard) Markup(lang string) *tb.ReplyMarkup {
 
 	p := Printer(lang, k.lang)
 	var btns []tb.Btn
-	for lbl, h := range k.cmds {
-		btn := m.Text(p.Sprintf(string(lbl)))
+	for _, kc := range k.cmds {
+		btn := m.Text(p.Sprintf(string(kc.Label)))
 		btns = append(btns, btn)
-		k.b.Handle(&btn, h)
+		k.b.Handle(&btn, kc.Handler)
 	}
 	m.Reply(organizeButtons(btns, k.btnsInRow)...)
 	return m

@@ -4,6 +4,16 @@ import tb "gopkg.in/tucnak/telebot.v2"
 
 type BtnLabel string
 
+type KbdOption func(k *Keyboard)
+
+func KbdOptButtonsInRow(n int) KbdOption {
+	return func(k *Keyboard) {
+		if n > 0 {
+			k.btnsInRow = n
+		}
+	}
+}
+
 type Keyboard struct {
 	commonCtl
 	cmds      KeyboardCommands
@@ -12,11 +22,14 @@ type Keyboard struct {
 
 type KeyboardCommands map[BtnLabel]func(m *tb.Message)
 
-func NewKeyboard(b Boter, cmds KeyboardCommands) *Keyboard {
+func NewKeyboard(b Boter, cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
 	kbd := &Keyboard{
 		commonCtl: commonCtl{b: b},
 		cmds:      cmds,
 		btnsInRow: defNumButtons,
+	}
+	for _, opt := range opts {
+		opt(kbd)
 	}
 	return kbd
 }

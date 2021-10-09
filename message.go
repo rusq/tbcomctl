@@ -3,7 +3,7 @@ package tbcomctl
 import (
 	"context"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 // Message is the controller that sends a message.

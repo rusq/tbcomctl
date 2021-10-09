@@ -9,7 +9,7 @@ import (
 
 	"github.com/rusq/dlog"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 const (

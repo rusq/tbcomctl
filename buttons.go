@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 type buttons struct {

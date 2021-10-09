@@ -1,6 +1,6 @@
 package tbcomctl
 
-import tb "gopkg.in/tucnak/telebot.v2"
+import tb "gopkg.in/tucnak/telebot.v3"
 
 type BtnLabel string
 

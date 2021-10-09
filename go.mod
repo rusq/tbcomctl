@@ -8,5 +8,5 @@ require (
 	github.com/rusq/dlog v1.3.0
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/text v0.3.5
-	gopkg.in/tucnak/telebot.v2 v2.3.5
+	gopkg.in/tucnak/telebot.v3 v3.0.0-20210930165304-9a08d98f4ee7
 )

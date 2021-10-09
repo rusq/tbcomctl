@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 // Rating is a struct for attaching post rating.

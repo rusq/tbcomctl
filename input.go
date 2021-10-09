@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 const retryDelay = 500 * time.Millisecond

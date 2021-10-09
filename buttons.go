@@ -21,7 +21,7 @@ func (b *buttons) SetMaxButtons(n int) {
 type PostButtons struct {
 	*buttons
 	b    Boter
-	cbFn func(cb *tb.Callback)
+	cbFn tb.HandlerFunc
 }
 
 type PBOption func(*PostButtons)
@@ -35,7 +35,7 @@ func PBOptMaxButtons(n int) PBOption {
 // NewPostButtons creates an instance of PostButtons.  The callbackFunction is
 // the function that will be assigned and called for each button press, so it
 // should handle all possible values.
-func NewPostButtons(b Boter, callbackFn func(cb *tb.Callback), opts ...PBOption) *PostButtons {
+func NewPostButtons(b Boter, callbackFn func(c tb.Context) error, opts ...PBOption) *PostButtons {
 	pb := &PostButtons{
 		b:       b,
 		cbFn:    callbackFn,
@@ -62,7 +62,7 @@ func (pb *PostButtons) Markup(labels []string, pattern ...uint) (*tb.ReplyMarkup
 // ButtonMarkup returns the button markup for the message.  It creates handlers
 // for all the buttons assigning the cbFn callback function to each of them.
 // Values must be unique.  maxRowButtons is maximum number of buttons in a row.
-func ButtonMarkup(b Boter, values []string, maxRowButtons int, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
+func ButtonMarkup(b Boter, values []string, maxRowButtons int, cbFn func(c tb.Context) error) *tb.ReplyMarkup {
 	if maxRowButtons <= 0 || defNumButtons < maxRowButtons {
 		maxRowButtons = defNumButtons
 	}
@@ -71,7 +71,7 @@ func ButtonMarkup(b Boter, values []string, maxRowButtons int, cbFn func(*tb.Cal
 	return markup
 }
 
-func ButtonPatternMarkup(b Boter, values []string, pattern []uint, cbFn func(*tb.Callback)) (*tb.ReplyMarkup, error) {
+func ButtonPatternMarkup(b Boter, values []string, pattern []uint, cbFn func(c tb.Context) error) (*tb.ReplyMarkup, error) {
 	markup, btns := createButtons(b, values, cbFn)
 	rows, err := organizeButtonsPattern(btns, pattern)
 	if err != nil {
@@ -81,7 +81,7 @@ func ButtonPatternMarkup(b Boter, values []string, pattern []uint, cbFn func(*tb
 	return markup, nil
 }
 
-func createButtons(b Boter, values []string, cbFn func(*tb.Callback)) (*tb.ReplyMarkup, []tb.Btn) {
+func createButtons(b Boter, values []string, cbFn func(c tb.Context) error) (*tb.ReplyMarkup, []tb.Btn) {
 	markup := new(tb.ReplyMarkup)
 	var btns []tb.Btn
 	for _, label := range values {

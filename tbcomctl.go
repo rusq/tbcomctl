@@ -26,7 +26,7 @@ const (
 
 // Boter is the interface to send messages.
 type Boter interface {
-	Handle(endpoint interface{}, handler interface{})
+	Handle(endpoint interface{}, h tb.HandlerFunc, m ...tb.MiddlewareFunc)
 	Send(to tb.Recipient, what interface{}, options ...interface{}) (*tb.Message, error)
 	Edit(msg tb.Editable, what interface{}, options ...interface{}) (*tb.Message, error)
 	Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error
@@ -47,7 +47,7 @@ type BotNotifier interface {
 // be chained together
 type Controller interface {
 	// Handler is the controller's message handler.
-	Handler(m *tb.Message)
+	Handler(c tb.Context) error
 	// Name returns the name of the control assigned to it on creation.  When
 	// Controller is a part of a form, one can call Form.Controller(name) method
 	// to get the controller.
@@ -99,20 +99,20 @@ type commonCtl struct {
 
 // PrivateOnly is the middleware that restricts the handler to only private
 // messages.
-func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {
-	return PrivateOnlyMsg(nil, "", fn)
+func PrivateOnly(fn tb.HandlerFunc) tb.HandlerFunc {
+	return PrivateOnlyMsg("", fn)
 }
 
-func PrivateOnlyMsg(b Boter, msg string, fn func(m *tb.Message)) func(*tb.Message) {
-	return func(m *tb.Message) {
-		if !m.Private() {
-			if !(b == nil || msg == "") {
-				pr := Printer(m.Sender.LanguageCode)
-				b.Send(m.Chat, pr.Sprintf(msg))
+func PrivateOnlyMsg(msg string, fn tb.HandlerFunc) tb.HandlerFunc {
+	return func(c tb.Context) error {
+		if !c.Message().Private() {
+			if msg != "" {
+				pr := Printer(c.Sender().LanguageCode)
+				c.Send(pr.Sprintf(msg))
 			}
-			return
+			return nil
 		}
-		fn(m)
+		return fn(c)
 	}
 }
 
@@ -267,7 +267,7 @@ func (c *commonCtl) reqIDInfo(r tb.Recipient, msgID int) (string, time.Time) {
 // telegram button will have a button index pressed by the user in the
 // callback.Data. Prefix is the prefix that will be prepended to the unique
 // before hash is called to form the Control-specific unique fields.
-func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix string, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
+func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix string, cbFn func(tb.Context) error) *tb.ReplyMarkup {
 	const (
 		sep = ": "
 	)
@@ -302,7 +302,7 @@ func (c *commonCtl) SetPrev(ctrl Controller) {
 	}
 }
 
-func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) {
+func NewControllerChain(first Controller, cc ...Controller) tb.HandlerFunc {
 	var chain Controller
 	for i := len(cc) - 1; i >= 0; i-- {
 		cc[i].SetNext(chain)

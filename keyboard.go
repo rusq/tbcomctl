@@ -10,7 +10,7 @@ type Keyboard struct {
 	btnsInRow int
 }
 
-type KeyboardCommands map[BtnLabel]func(m *tb.Message)
+type KeyboardCommands map[BtnLabel]func(c tb.Context) error
 
 func NewKeyboard(b Boter, cmds KeyboardCommands) *Keyboard {
 	kbd := &Keyboard{
@@ -23,7 +23,7 @@ func NewKeyboard(b Boter, cmds KeyboardCommands) *Keyboard {
 
 // Markup returns the markup to be sent to user.
 func (k *Keyboard) Markup(lang string) *tb.ReplyMarkup {
-	m := &tb.ReplyMarkup{ResizeReplyKeyboard: true}
+	m := &tb.ReplyMarkup{ResizeKeyboard: true}
 
 	p := Printer(lang, k.lang)
 	var btns []tb.Btn

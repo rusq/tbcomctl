@@ -2,6 +2,7 @@ package tbcomctl
 
 import (
 	"context"
+	"fmt"
 
 	tb "gopkg.in/tucnak/telebot.v3"
 )
@@ -30,19 +31,18 @@ func NewMessageText(b Boter, name, text string, sendOpts ...interface{}) *Messag
 }
 
 // Handler is the Message controller's message handler.
-func (m *Message) Handler(msg *tb.Message) {
+func (m *Message) Handler(c tb.Context) error {
 	ctx := WithController(context.Background(), m)
-	txt, err := m.textFn(ctx, msg.Sender)
+	txt, err := m.textFn(ctx, c.Sender())
 	if err != nil {
-		lg.Printf("tbcomctl: message: text function error: %s: %s", Userinfo(msg.Sender), err)
-		return
+		return fmt.Errorf("tbcomctl: message: text function error: %s: %w", Userinfo(c.Sender()), err)
 	}
 
-	outbound, err := m.sendOrEdit(msg, txt, m.opts...)
+	outbound, err := m.sendOrEdit(c.Message(), txt, m.opts...)
 	if err != nil {
-		lg.Printf("tbcomctl: message: send error: %s: %s", Userinfo(msg.Sender), err)
-		return
+		return fmt.Errorf("tbcomctl: message: send error: %s: %w", Userinfo(c.Sender()), err)
 	}
-	m.register(msg.Sender, outbound.ID)
-	m.unregister(msg.Sender, outbound.ID)
+	m.register(c.Sender(), outbound.ID)
+	m.unregister(c.Sender(), outbound.ID)
+	return nil
 }

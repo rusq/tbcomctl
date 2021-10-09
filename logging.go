@@ -46,7 +46,7 @@ func ChatInfo(ch *tb.Chat) string {
 	}
 	if ch.Type == chatPrivate {
 		return chatPrivate + ":" + Userinfo(&tb.User{
-			ID:        int(ch.ID),
+			ID:        ch.ID,
 			FirstName: ch.FirstName,
 			LastName:  ch.LastName,
 			Username:  ch.Username,

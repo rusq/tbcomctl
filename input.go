@@ -2,6 +2,7 @@ package tbcomctl
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	tb "gopkg.in/tucnak/telebot.v3"
@@ -27,7 +28,7 @@ var _ Controller = &Input{}
 // MsgErrFunc is the function that processes the user input.  If the input is
 // invalid, it should return InputError with the message, then the user is
 // offered to retry the input.
-type MsgErrFunc func(ctx context.Context, m *tb.Message) error
+type MsgErrFunc func(ctx context.Context, c tb.Context) error
 
 type InputOption func(*Input)
 
@@ -65,26 +66,25 @@ func NewInputText(b BotNotifier, name string, text string, onTextFn MsgErrFunc, 
 	return NewInput(b, name, TextFn(text), onTextFn, opts...)
 }
 
-func (ip *Input) Handler(m *tb.Message) {
+func (ip *Input) Handler(c tb.Context) error {
 	var opts []interface{}
 	if !ip.noReply {
 		opts = append(opts, tb.ForceReply)
 	}
-	pr := Printer(m.Sender.LanguageCode)
-	text, err := ip.textFn(WithController(context.Background(), ip), m.Sender)
+	pr := Printer(c.Sender().LanguageCode)
+	text, err := ip.textFn(WithController(context.Background(), ip), c.Sender())
 	if err != nil {
-		lg.Printf("error while generating text for controller: %s: %s", ip.name, err)
-		ip.b.Send(m.Sender, pr.Sprintf(MsgUnexpected))
-		return
+		c.Send(pr.Sprintf(MsgUnexpected))
+		return fmt.Errorf("error while generating text for controller: %s: %w", ip.name, err)
 	}
-	outbound, err := ip.b.Send(m.Sender, text, opts...)
+	outbound, err := c.Bot().Send(c.Sender(), text, opts...)
 	if err != nil {
-		lg.Println("Input.Handle:", err)
-		return
+		return fmt.Errorf("Input.Handle: %w", err)
 	}
-	ip.waitFor(m.Sender, outbound.ID)
-	ip.register(m.Sender, outbound.ID)
+	ip.waitFor(c.Sender(), outbound.ID)
+	ip.register(c.Sender(), outbound.ID)
 	ip.logOutgoingMsg(outbound)
+	return nil
 }
 
 // NewInputError returns an input error with msg.
@@ -96,50 +96,47 @@ const nothing = 0
 
 // OnTextMw returns the middleware that should wrap the OnText handler. It will
 // process the message only if control awaits for this particular user input.
-func (ip *Input) OnTextMw(fn func(m *tb.Message)) func(*tb.Message) {
-	return func(m *tb.Message) {
-		if !ip.isWaiting(m.Sender) {
+func (ip *Input) OnTextMw(fn func(c tb.Context) error) tb.HandlerFunc {
+	return func(c tb.Context) error {
+		if !ip.isWaiting(c.Sender()) {
 			// not waiting for input, proceed to the next handler, if it's present.
 			if fn != nil {
-				fn(m)
+				return fn(c)
 			}
-			return
+			return nil
 		}
 
-		valueErr := ip.OnTextFn(WithController(context.Background(), ip), m)
+		valueErr := ip.OnTextFn(WithController(context.Background(), ip), c)
 		if valueErr != nil {
 			// wrong input or some other problem
 			lg.Println(valueErr)
 			if e, ok := valueErr.(*Error); ok {
-				ip.processError(m, e.Msg)
-				return
+				return ip.processError(c, e.Msg)
 			} else {
-				if _, err := ip.b.Send(m.Sender, MsgUnexpected); err != nil {
-					lg.Println(err)
-					return
+				if err := c.Send(MsgUnexpected); err != nil {
+					return err
 				}
 			}
 		}
 
-		ip.SetValue(m.Sender.Recipient(), m.Text)
+		ip.SetValue(c.Sender().Recipient(), c.Message().Text)
 
-		ip.logCallbackMsg(m)
-		ip.unregister(m.Sender, ip.stopWaiting(m.Sender))
+		ip.logCallbackMsg(c.Message())
+		ip.unregister(c.Sender(), ip.stopWaiting(c.Sender()))
 
 		if ip.next != nil && valueErr == nil {
 			// if there are chained controls
-			ip.next.Handler(m)
+			return ip.next.Handler(c)
 		}
+		return nil
 	}
 }
 
-func (ip *Input) processError(m *tb.Message, errmsg string) {
-	if _, err := ip.b.Send(m.Sender, errmsg); err != nil {
-		return
+func (ip *Input) processError(c tb.Context, errmsg string) error {
+	if err := c.Send(errmsg); err != nil {
+		return err
 	}
-	if b, ok := ip.b.(BotNotifier); ok {
-		b.Notify(m.Sender, tb.Typing)
-	}
+	c.Bot().Notify(c.Sender(), tb.Typing)
 	time.Sleep(retryDelay)
-	ip.Handler(m)
+	return ip.Handler(c)
 }

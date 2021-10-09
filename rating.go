@@ -78,38 +78,39 @@ func (rb *Rating) Markup(btns [2]Button) *tb.ReplyMarkup {
 
 var ErrAlreadyVoted = errors.New("already voted")
 
-func (rb *Rating) callback(cb *tb.Callback) {
+func (rb *Rating) callback(c tb.Context) error {
 	respErr := tb.CallbackResponse{Text: MsgUnexpected}
-	i, err := strconv.Atoi(cb.Data)
+	data := c.Data()
+	i, err := strconv.Atoi(data)
 	if err != nil {
-		lg.Printf("failed to get the button index from data: %s", cb.Data)
-		rb.b.Respond(cb, &respErr)
-		return
+		lg.Printf("failed to get the button index from data: %s", data)
+		c.Respond(&respErr)
+		return err
 	}
 
 	// get existing value for the post
-	buttons, valErr := rb.rateFn(cb.Message, cb.Sender, i)
+	buttons, valErr := rb.rateFn(c.Message(), c.Sender(), i)
 	if valErr != nil && valErr != ErrAlreadyVoted {
 		lg.Printf("failed to get the data from the rating callback: %s", valErr)
-		dlg.Printf("callback: %s", Sdump(cb))
-		rb.b.Respond(cb, &respErr)
-		return
+		dlg.Printf("callback: %s", Sdump(c.Callback()))
+		c.Respond(&respErr)
+		return valErr
 	}
 
 	var msg string
 	// update the post with new buttons
 	if valErr != ErrAlreadyVoted {
-		if _, err := rb.b.Edit(cb.Message, rb.Markup(buttons)); err != nil {
+		if err := c.Edit(c.Message(), rb.Markup(buttons)); err != nil {
 			if e, ok := err.(*tb.APIError); ok && e.Code == 400 && strings.Contains(e.Description, "exactly the same") {
-				lg.Printf("%s: same button pressed", Userinfo(cb.Sender))
+				lg.Printf("%s: same button pressed", Userinfo(c.Sender()))
 			} else {
-				lg.Printf("failed to edit the message: %v: %s", cb.Message, err)
-				rb.b.Respond(cb, &respErr)
-				return
+				lg.Printf("failed to edit the message: %v: %s", c.Message(), err)
+				c.Respond(&respErr)
+				return err
 			}
 		}
 		msg = MsgVoteCounted
 	}
 
-	rb.b.Respond(cb, &tb.CallbackResponse{Text: msg})
+	return c.Respond(&tb.CallbackResponse{Text: msg})
 }

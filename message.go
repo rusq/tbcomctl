@@ -38,7 +38,7 @@ func (m *Message) Handler(c tb.Context) error {
 		return fmt.Errorf("tbcomctl: message: text function error: %s: %w", Userinfo(c.Sender()), err)
 	}
 
-	outbound, err := m.sendOrEdit(c.Message(), txt, m.opts...)
+	outbound, err := m.sendOrEdit(c, txt, m.opts...)
 	if err != nil {
 		return fmt.Errorf("tbcomctl: message: send error: %s: %w", Userinfo(c.Sender()), err)
 	}

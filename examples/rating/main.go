@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/rusq/tbcomctl"
+	"github.com/rusq/tbcomctl/v3"
 	tb "gopkg.in/tucnak/telebot.v3"
 )
 

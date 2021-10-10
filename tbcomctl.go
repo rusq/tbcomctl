@@ -400,22 +400,22 @@ func (c *commonCtl) setOverwrite(b bool) {
 	c.overwrite = b
 }
 
-func (c *commonCtl) sendOrEdit(userMsg *tb.Message, txt string, sendOpts ...interface{}) (*tb.Message, error) {
+func (c *commonCtl) sendOrEdit(ct tb.Context, txt string, sendOpts ...interface{}) (*tb.Message, error) {
 	var outbound *tb.Message
 	var err error
 	if c.overwrite && c.prev != nil {
-		msgID, ok := c.prev.OutgoingID(userMsg.Sender.Recipient())
+		msgID, ok := c.prev.OutgoingID(ct.Sender().Recipient())
 		if !ok {
-			return nil, fmt.Errorf("%s can't find previous message ID for %s", caller(2), Userinfo(userMsg.Sender))
+			return nil, fmt.Errorf("%s can't find previous message ID for %s", caller(2), Userinfo(ct.Sender()))
 
 		}
-		prevMsg := tb.Message{ID: msgID, Chat: userMsg.Chat}
-		outbound, err = c.b.Edit(&prevMsg,
+		prevMsg := tb.Message{ID: msgID, Chat: ct.Chat()}
+		outbound, err = ct.Bot().Edit(&prevMsg,
 			txt,
 			sendOpts...,
 		)
 	} else {
-		outbound, err = c.b.Send(userMsg.Chat, txt, sendOpts...)
+		outbound, err = ct.Bot().Send(ct.Chat(), txt, sendOpts...)
 	}
 	return outbound, err
 }

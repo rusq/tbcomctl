@@ -23,7 +23,11 @@ type Input struct {
 	noReply bool
 }
 
-var _ Controller = &Input{}
+// interface assertions
+var (
+	_ Controller = &Input{}
+	_ onTexter   = &Input{}
+)
 
 // MsgErrFunc is the function that processes the user input.  If the input is
 // invalid, it should return InputError with the message, then the user is
@@ -96,8 +100,8 @@ const nothing = 0
 
 // OnTextMw returns the middleware that should wrap the OnText handler. It will
 // process the message only if control awaits for this particular user input.
-func (ip *Input) OnTextMw(fn func(c tb.Context) error) tb.HandlerFunc {
-	return func(c tb.Context) error {
+func (ip *Input) OnTextMw(fn tb.HandlerFunc) tb.HandlerFunc {
+	return tb.HandlerFunc(func(c tb.Context) error {
 		if !ip.isWaiting(c.Sender()) {
 			// not waiting for input, proceed to the next handler, if it's present.
 			if fn != nil {
@@ -129,7 +133,7 @@ func (ip *Input) OnTextMw(fn func(c tb.Context) error) tb.HandlerFunc {
 			return ip.next.Handler(c)
 		}
 		return nil
-	}
+	})
 }
 
 func (ip *Input) processError(c tb.Context, errmsg string) error {

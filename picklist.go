@@ -148,18 +148,18 @@ func (p *Picklist) Handler(c tb.Context) error {
 	// generate markup
 	markup := p.inlineMarkup(values)
 	// send message with markup
-	pr := Printer(m.Sender.LanguageCode, p.lang)
+	pr := Printer(c.Sender().LanguageCode, p.lang)
 	text, err := p.textFn(WithController(context.Background(), p), m.Sender)
 	if err != nil {
 		c.Send(pr.Sprintf(MsgUnexpected))
 		return fmt.Errorf("error while generating text for controller: %s: %w", p.name, err)
 	}
 	// if overwrite is true and prev is not nil - edit, otherwise - send.
-	outbound, err := p.sendOrEdit(m, text, &tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML})
+	outbound, err := p.sendOrEdit(c, text, &tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML})
 	if err != nil {
 		return err
 	}
-	_ = p.register(m.Sender, outbound.ID)
+	_ = p.register(c.Sender(), outbound.ID)
 	p.logOutgoingMsg(outbound, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
 	return nil
 }
@@ -196,14 +196,14 @@ func (p *Picklist) Callback(c tb.Context) error {
 		resp = tb.CallbackResponse{Text: MsgOK}
 	}
 
-	p.SetValue(cb.Sender.Recipient(), cb.Data)
+	p.SetValue(c.Sender().Recipient(), cb.Data)
 	// edit message
 	p.editMsg(ctx, c)
-	if err := c.Bot().Respond(cb, &resp); err != nil {
+	if err := c.Respond(&resp); err != nil {
 		trace.Log(ctx, "respond", err.Error())
 	}
 	err = p.nextHandler(c)
-	p.unregister(cb.Sender, cb.Message.ID)
+	p.unregister(c.Sender(), cb.Message.ID)
 	return err
 }
 

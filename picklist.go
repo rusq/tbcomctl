@@ -179,7 +179,7 @@ func (p *Picklist) Callback(c tb.Context) error {
 			if err := c.Respond(&tb.CallbackResponse{Text: err.Error(), ShowAlert: true}); err != nil {
 				trace.Logf(ctx, "respond", err.Error())
 			}
-			p.unregister(cb.Sender, cb.Message.ID)
+			p.unregister(c.Sender(), cb.Message.ID)
 			return e
 		} else {
 			switch e.Type {
@@ -217,8 +217,7 @@ func (p *Picklist) editMsg(ctx context.Context, c tb.Context) bool {
 	}
 
 	if p.removeButtons {
-		if _, err := c.Bot().Edit(
-			cb.Message,
+		if err := c.Edit(
 			text,
 			&tb.SendOptions{ParseMode: tb.ModeHTML},
 		); err != nil {
@@ -240,7 +239,7 @@ func (p *Picklist) editMsg(ctx context.Context, c tb.Context) bool {
 	}
 
 	markup := p.inlineMarkup(values)
-	if _, err := c.Bot().Edit(cb.Message,
+	if err := c.Edit(
 		p.format(cb.Sender, text),
 		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
 	); err != nil {

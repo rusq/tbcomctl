@@ -58,7 +58,7 @@ func (sc *SubChecker) callback(ctx context.Context, cb *tb.Callback) error {
 	for _, chID := range sc.chats {
 		ch, err := sc.cachedChat(chID)
 		if err != nil {
-			return fmt.Errorf("internal error: can't resolve chat ID: %s: %s", chID, err)
+			return fmt.Errorf("internal error: can't resolve chat ID: %d: %w", chID, err)
 		}
 		cm, err := b.ChatMemberOf(ch, cb.Sender)
 		if err != nil {

@@ -100,7 +100,7 @@ func (rb *Rating) callback(c tb.Context) error {
 	var msg string
 	// update the post with new buttons
 	if valErr != ErrAlreadyVoted {
-		if err := c.Edit(c.Message(), rb.Markup(buttons)); err != nil {
+		if err := c.Edit(rb.Markup(buttons)); err != nil {
 			if e, ok := err.(*tb.APIError); ok && e.Code == 400 && strings.Contains(e.Description, "exactly the same") {
 				lg.Printf("%s: same button pressed", Userinfo(c.Sender()))
 			} else {

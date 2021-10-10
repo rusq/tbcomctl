@@ -10,9 +10,9 @@ import (
 // SubChecker is controller to check the chat subscription.
 type SubChecker struct {
 	commonCtl
-	chats     []string
+	chats     []int64
 	showList  bool
-	chatCache map[string]*tb.Chat
+	chatCache map[int64]*tb.Chat
 	pl        *Picklist
 }
 
@@ -32,7 +32,7 @@ func SCOptFallbackLang(lang string) SCOption {
 
 // NewSubChecker creates new subscription checker that checks the subscription
 // on the desired channels.  Boter must be added to channels for this to work.
-func NewSubChecker(b BotChecker, name string, textFn TextFunc, chats []string, opts ...SCOption) *SubChecker {
+func NewSubChecker(b BotChecker, name string, textFn TextFunc, chats []int64, opts ...SCOption) *SubChecker {
 	sc := &SubChecker{
 		commonCtl: newCommonCtl(b, name, textFn),
 		chats:     chats,
@@ -77,13 +77,13 @@ func (sc *SubChecker) callback(ctx context.Context, cb *tb.Callback) error {
 	return nil
 }
 
-func (sc *SubChecker) Handler(m *tb.Message) {
-	sc.pl.Handler(m)
+func (sc *SubChecker) Handler(c tb.Context) error {
+	return sc.pl.Handler(c)
 }
 
-func (sc *SubChecker) cachedChat(id string) (*tb.Chat, error) {
+func (sc *SubChecker) cachedChat(id int64) (*tb.Chat, error) {
 	if sc.chatCache == nil {
-		sc.chatCache = make(map[string]*tb.Chat)
+		sc.chatCache = make(map[int64]*tb.Chat)
 	}
 	b := sc.b.(BotChecker)
 	ch, ok := sc.chatCache[id]

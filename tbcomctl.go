@@ -34,8 +34,8 @@ type Boter interface {
 
 type BotChecker interface {
 	Boter
-	ChatMemberOf(chat *tb.Chat, user *tb.User) (*tb.ChatMember, error)
-	ChatByID(id string) (*tb.Chat, error)
+	ChatMemberOf(chat tb.Recipient, r tb.Recipient) (*tb.ChatMember, error)
+	ChatByID(id int64) (*tb.Chat, error)
 }
 
 type BotNotifier interface {
@@ -144,7 +144,7 @@ type ValuesFunc func(ctx context.Context, u *tb.User) ([]string, error)
 // TextFunc returns formatted text, possibly personalised for user u.
 type TextFunc func(ctx context.Context, u *tb.User) (string, error)
 
-type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
+type MiddlewareFunc func(tb.HandlerFunc) tb.HandlerFunc
 
 type ErrFunc func(ctx context.Context, m *tb.Message, err error)
 

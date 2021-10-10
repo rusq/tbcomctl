@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -41,8 +42,13 @@ func main() {
 		tbcomctl.RBOptShowVoteCounter(true),
 	)
 
+	iChat, err := strconv.ParseInt(chat, 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	go func() {
-		ch, err := b.ChatByID(chat)
+		ch, err := b.ChatByID(iChat)
 		if err != nil {
 			log.Fatal(err)
 		}

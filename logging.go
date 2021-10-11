@@ -30,6 +30,11 @@ type Logger interface {
 	Printf(format string, a ...interface{})
 }
 
+// SenderInfo is the convenience function to log the sender info in the context.
+func SenderInfo(c tb.Context) string {
+	return Userinfo(c.Sender())
+}
+
 // Userinfo returns the user info.
 func Userinfo(u *tb.User) string {
 	if u == nil {

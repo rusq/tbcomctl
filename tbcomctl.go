@@ -207,7 +207,7 @@ func (c *commonCtl) register(r tb.Recipient, msgID int) uuid.UUID {
 	return reqID
 }
 
-// requestEnsure initialises that request cache is initialised.
+// requestEnsure ensures that request cache is initialised.
 func (c *commonCtl) requestEnsure(r tb.Recipient) {
 	if c.reqCache == nil {
 		c.reqCache = make(map[string]map[int]uuid.UUID)
@@ -229,7 +229,7 @@ func (c *commonCtl) requestFor(r tb.Recipient, msgID int) (uuid.UUID, bool) {
 	return reqID, ok
 }
 
-//
+// unregister unregisters the request from cache.
 func (c *commonCtl) unregister(r tb.Recipient, msgID int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

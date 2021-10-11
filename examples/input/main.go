@@ -28,8 +28,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	nameIp := tbcomctl.NewInputText(b, "name", "Input your name:", processInput(b))
-	ageIp := tbcomctl.NewInputText(b, "age", "Input your age", processInput(b))
+	nameIp := tbcomctl.NewInputText("name", "Input your name:", processInput(b))
+	ageIp := tbcomctl.NewInputText("age", "Input your age", processInput(b))
 
 	handler := tbcomctl.NewControllerChain(nameIp, ageIp)
 	form := tbcomctl.NewForm(nameIp, ageIp)

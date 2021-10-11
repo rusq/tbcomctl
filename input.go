@@ -55,9 +55,9 @@ func IOptPrivateOnly(b bool) InputOption {
 // input.  It should return an error if the user input is not accepted, and then
 // user is offered to retry.  It can format the return error with fmt.Errorf, as
 // this is what user will see.  next is allowed to be nil.
-func NewInput(b BotNotifier, name string, textFn TextFunc, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+func NewInput(name string, textFn TextFunc, onTextFn MsgErrFunc, opts ...InputOption) *Input {
 	ip := &Input{
-		commonCtl: newCommonCtl(b, name, textFn),
+		commonCtl: newCommonCtl(name, textFn),
 		OnTextFn:  onTextFn,
 	}
 	for _, opt := range opts {
@@ -66,8 +66,8 @@ func NewInput(b BotNotifier, name string, textFn TextFunc, onTextFn MsgErrFunc, 
 	return ip
 }
 
-func NewInputText(b BotNotifier, name string, text string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
-	return NewInput(b, name, TextFn(text), onTextFn, opts...)
+func NewInputText(name string, text string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+	return NewInput(name, TextFn(text), onTextFn, opts...)
 }
 
 func (ip *Input) Handler(c tb.Context) error {

@@ -22,9 +22,9 @@ type Keyboard struct {
 
 type KeyboardCommands map[BtnLabel]func(c tb.Context) error
 
-func NewKeyboard(b Boter, cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
+func NewKeyboard(cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
 	kbd := &Keyboard{
-		commonCtl: commonCtl{b: b},
+		commonCtl: commonCtl{},
 		cmds:      cmds,
 		btnsInRow: defNumButtons,
 	}
@@ -35,7 +35,7 @@ func NewKeyboard(b Boter, cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
 }
 
 // Markup returns the markup to be sent to user.
-func (k *Keyboard) Markup(lang string) *tb.ReplyMarkup {
+func (k *Keyboard) Markup(b *tb.Bot, lang string) *tb.ReplyMarkup {
 	m := &tb.ReplyMarkup{ResizeKeyboard: true}
 
 	p := Printer(lang, k.lang)
@@ -43,15 +43,15 @@ func (k *Keyboard) Markup(lang string) *tb.ReplyMarkup {
 	for lbl, h := range k.cmds {
 		btn := m.Text(p.Sprintf(string(lbl)))
 		btns = append(btns, btn)
-		k.b.Handle(&btn, h)
+		b.Handle(&btn, h)
 	}
 	m.Reply(organizeButtons(btns, k.btnsInRow)...)
 	return m
 }
 
 // InitForLanguages initialises handlers for languages listed.
-func (k *Keyboard) InitForLanguages(lang ...string) {
+func (k *Keyboard) InitForLanguages(b *tb.Bot, lang ...string) {
 	for _, l := range lang {
-		k.Markup(l)
+		k.Markup(b, l)
 	}
 }

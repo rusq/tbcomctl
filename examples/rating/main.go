@@ -30,7 +30,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rb := tbcomctl.NewRating(b,
+	rb := tbcomctl.NewRating(
 		func(e tb.Editable, r *tb.User, idx int) ([2]tbcomctl.Button, error) {
 			mid, cid := e.MessageSig()
 			log.Printf("%s, %d: u: %s, idx %d", mid, cid, r.Recipient(), idx)
@@ -52,7 +52,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if _, err := b.Send(ch, "rating test", rb.Markup(ratingButtons())); err != nil {
+		if _, err := b.Send(ch, "rating test", rb.Markup(b, ratingButtons())); err != nil {
 			log.Fatal(err)
 		}
 	}()

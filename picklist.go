@@ -103,15 +103,12 @@ func PickOptBtnPattern(pattern []uint) PicklistOption {
 }
 
 // NewPicklist creates a new picklist.
-func NewPicklist(b Boter, name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
-	if b == nil {
-		panic("bot is required")
-	}
+func NewPicklist(name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
 	if textFn == nil || valuesFn == nil || callbackFn == nil {
 		panic("one or more of the functions not set")
 	}
 	p := &Picklist{
-		commonCtl: newCommonCtl(b, name, textFn),
+		commonCtl: newCommonCtl(name, textFn),
 		vFn:       valuesFn,
 		cbFn:      callbackFn,
 		buttons:   &buttons{maxButtons: defNumButtons},
@@ -123,8 +120,8 @@ func NewPicklist(b Boter, name string, textFn TextFunc, valuesFn ValuesFunc, cal
 }
 
 // NewPicklistText is a convenience function to return picklist with fixed text and values.
-func NewPicklistText(b Boter, name string, text string, values []string, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
-	return NewPicklist(b,
+func NewPicklistText(name string, text string, values []string, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
+	return NewPicklist(
 		name,
 		TextFn(text),
 		func(ctx context.Context, u *tb.User) ([]string, error) { return values, nil },
@@ -146,7 +143,7 @@ func (p *Picklist) Handler(c tb.Context) error {
 	}
 
 	// generate markup
-	markup := p.inlineMarkup(values)
+	markup := p.inlineMarkup(c, values)
 	// send message with markup
 	pr := Printer(c.Sender().LanguageCode, p.lang)
 	text, err := p.textFn(WithController(context.Background(), p), m.Sender)
@@ -172,7 +169,7 @@ func (p *Picklist) Callback(c tb.Context) error {
 	p.logCallback(cb)
 
 	var resp tb.CallbackResponse
-	err := p.cbFn(WithController(ctx, p), cb)
+	err := p.cbFn(WithController(ctx, p), c)
 	if err != nil {
 		if e, ok := err.(*Error); !ok {
 			p.editMsg(ctx, c)
@@ -238,7 +235,7 @@ func (p *Picklist) editMsg(ctx context.Context, c tb.Context) bool {
 		return false
 	}
 
-	markup := p.inlineMarkup(values)
+	markup := p.inlineMarkup(c, values)
 	if err := c.Edit(
 		p.format(cb.Sender, text),
 		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
@@ -258,11 +255,11 @@ func (p *Picklist) format(u *tb.User, text string) string {
 	return text
 }
 
-func (p *Picklist) inlineMarkup(values []string) *tb.ReplyMarkup {
+func (p *Picklist) inlineMarkup(c tb.Context, values []string) *tb.ReplyMarkup {
 	if len(p.btnPattern) == 0 {
-		return ButtonMarkup(p.b, values, p.maxButtons, p.Callback)
+		return ButtonMarkup(c, values, p.maxButtons, p.Callback)
 	}
-	m, err := ButtonPatternMarkup(p.b, values, p.btnPattern, p.Callback)
+	m, err := ButtonPatternMarkup(c, values, p.btnPattern, p.Callback)
 	if err != nil {
 		panic(err) // TODO handle this more gracefully.
 	}

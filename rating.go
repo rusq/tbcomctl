@@ -42,9 +42,9 @@ func RBOptShowPostRating(b bool) RBOption {
 
 type RatingType int
 
-func NewRating(b Boter, fn RatingFunc, opts ...RBOption) *Rating {
+func NewRating(fn RatingFunc, opts ...RBOption) *Rating {
 	rb := &Rating{
-		commonCtl: commonCtl{b: b},
+		commonCtl: commonCtl{},
 		rateFn:    fn,
 	}
 	for _, opt := range opts {
@@ -71,9 +71,9 @@ func (ri *Button) String() string {
 	return fmt.Sprintf("<Button name: %s, value: %d>", ri.Name, ri.Value)
 }
 
-func (rb *Rating) Markup(btns [2]Button) *tb.ReplyMarkup {
+func (rb *Rating) Markup(b *tb.Bot, btns [2]Button) *tb.ReplyMarkup {
 	const rbPrefix = "rating"
-	return rb.multibuttonMarkup(btns[:], rb.hasCounter, rbPrefix, rb.callback)
+	return rb.multibuttonMarkup(b, btns[:], rb.hasCounter, rbPrefix, rb.callback)
 }
 
 var ErrAlreadyVoted = errors.New("already voted")
@@ -100,7 +100,7 @@ func (rb *Rating) callback(c tb.Context) error {
 	var msg string
 	// update the post with new buttons
 	if valErr != ErrAlreadyVoted {
-		if err := c.Edit(rb.Markup(buttons)); err != nil {
+		if err := c.Edit(rb.Markup(c.Bot(), buttons)); err != nil {
 			if e, ok := err.(*tb.APIError); ok && e.Code == 400 && strings.Contains(e.Description, "exactly the same") {
 				lg.Printf("%s: same button pressed", Userinfo(c.Sender()))
 			} else {

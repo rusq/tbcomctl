@@ -18,16 +18,16 @@ var _ Controller = &Message{}
 // NewMessage creates new Message Controller.  One must pass Bot instance, name
 // of the controller, text function that returns the desired message and
 // optionally any sendOpts that will be supplied to telebot.Bot.Send.
-func NewMessage(b Boter, name string, textfn TextFunc, sendOpts ...interface{}) *Message {
+func NewMessage(name string, textfn TextFunc, sendOpts ...interface{}) *Message {
 	return &Message{
-		commonCtl: newCommonCtl(b, name, textfn),
+		commonCtl: newCommonCtl(name, textfn),
 		opts:      sendOpts,
 	}
 }
 
 // NewMessageText is a convenience wrapper for NewMessage with a fixed text.
-func NewMessageText(b Boter, name, text string, sendOpts ...interface{}) *Message {
-	return NewMessage(b, name, TextFn(text), sendOpts...)
+func NewMessageText(name, text string, sendOpts ...interface{}) *Message {
+	return NewMessage(name, TextFn(text), sendOpts...)
 }
 
 // Handler is the Message controller's message handler.

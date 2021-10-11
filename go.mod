@@ -1,4 +1,4 @@
-module github.com/rusq/tbcomctl
+module github.com/rusq/tbcomctl/v2
 
 go 1.15
 

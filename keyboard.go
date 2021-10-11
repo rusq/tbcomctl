@@ -1,6 +1,6 @@
 package tbcomctl
 
-import tb "gopkg.in/tucnak/telebot.v2"
+import tb "gopkg.in/tucnak/telebot.v3"
 
 type BtnLabel string
 
@@ -22,14 +22,16 @@ type Keyboard struct {
 
 type KeyboardCmd struct {
 	Label   BtnLabel
-	Handler func(m *tb.Message)
+	Handler tb.HandlerFunc
 }
 
 type KeyboardCommands []KeyboardCmd
 
-func NewKeyboard(b Boter, cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
+// type KeyboardCommands map[BtnLabel]func(c tb.Context) error
+
+func NewKeyboard(cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
 	kbd := &Keyboard{
-		commonCtl: commonCtl{b: b},
+		commonCtl: commonCtl{},
 		cmds:      cmds,
 		btnsInRow: defNumButtons,
 	}
@@ -40,23 +42,23 @@ func NewKeyboard(b Boter, cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
 }
 
 // Markup returns the markup to be sent to user.
-func (k *Keyboard) Markup(lang string) *tb.ReplyMarkup {
-	m := &tb.ReplyMarkup{ResizeReplyKeyboard: true}
+func (k *Keyboard) Markup(b *tb.Bot, lang string) *tb.ReplyMarkup {
+	m := &tb.ReplyMarkup{ResizeKeyboard: true}
 
 	p := Printer(lang, k.lang)
 	var btns []tb.Btn
 	for _, kc := range k.cmds {
 		btn := m.Text(p.Sprintf(string(kc.Label)))
 		btns = append(btns, btn)
-		k.b.Handle(&btn, kc.Handler)
+		b.Handle(&btn, kc.Handler)
 	}
 	m.Reply(organizeButtons(btns, k.btnsInRow)...)
 	return m
 }
 
 // InitForLanguages initialises handlers for languages listed.
-func (k *Keyboard) InitForLanguages(lang ...string) {
+func (k *Keyboard) InitForLanguages(b *tb.Bot, lang ...string) {
 	for _, l := range lang {
-		k.Markup(l)
+		k.Markup(b, l)
 	}
 }

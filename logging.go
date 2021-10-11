@@ -9,7 +9,7 @@ import (
 
 	"github.com/rusq/dlog"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 const (
@@ -30,6 +30,11 @@ type Logger interface {
 	Printf(format string, a ...interface{})
 }
 
+// SenderInfo is the convenience function to log the sender info in the context.
+func SenderInfo(c tb.Context) string {
+	return Userinfo(c.Sender())
+}
+
 // Userinfo returns the user info.
 func Userinfo(u *tb.User) string {
 	if u == nil {
@@ -46,7 +51,7 @@ func ChatInfo(ch *tb.Chat) string {
 	}
 	if ch.Type == chatPrivate {
 		return chatPrivate + ":" + Userinfo(&tb.User{
-			ID:        int(ch.ID),
+			ID:        ch.ID,
 			FirstName: ch.FirstName,
 			LastName:  ch.LastName,
 			Username:  ch.Username,

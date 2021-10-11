@@ -3,11 +3,12 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/rusq/tbcomctl"
-	tb "gopkg.in/tucnak/telebot.v2"
+	"github.com/rusq/tbcomctl/v3"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 var _ = godotenv.Load()
@@ -29,7 +30,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	rb := tbcomctl.NewRating(b,
+	rb := tbcomctl.NewRating(
 		func(e tb.Editable, r *tb.User, idx int) ([2]tbcomctl.Button, error) {
 			mid, cid := e.MessageSig()
 			log.Printf("%s, %d: u: %s, idx %d", mid, cid, r.Recipient(), idx)
@@ -41,12 +42,17 @@ func main() {
 		tbcomctl.RBOptShowVoteCounter(true),
 	)
 
+	iChat, err := strconv.ParseInt(chat, 10, 64)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	go func() {
-		ch, err := b.ChatByID(chat)
+		ch, err := b.ChatByID(iChat)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if _, err := b.Send(ch, "rating test", rb.Markup(ratingButtons())); err != nil {
+		if _, err := b.Send(ch, "rating test", rb.Markup(b, ratingButtons())); err != nil {
 			log.Fatal(err)
 		}
 	}()

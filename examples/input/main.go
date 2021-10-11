@@ -8,15 +8,15 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/rusq/tbcomctl"
-	tb "gopkg.in/tucnak/telebot.v2"
+	"github.com/rusq/tbcomctl/v3"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 var _ = godotenv.Load()
 
 var (
 	token = os.Getenv("TOKEN")
-	chat  = os.Getenv("CHAT")
+	// chat  = os.Getenv("CHAT")
 )
 
 func main() {
@@ -28,8 +28,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	nameIp := tbcomctl.NewInputText(b, "name", "Input your name:", processInput(b))
-	ageIp := tbcomctl.NewInputText(b, "age", "Input your age", processInput(b))
+	nameIp := tbcomctl.NewInputText("name", "Input your name:", processInput(b))
+	ageIp := tbcomctl.NewInputText("age", "Input your age", processInput(b))
 
 	handler := tbcomctl.NewControllerChain(nameIp, ageIp)
 	form := tbcomctl.NewForm(nameIp, ageIp)
@@ -37,16 +37,17 @@ func main() {
 	b.Handle("/input", handler)
 	b.Handle("/form", form.Handler)
 	// b.Handle(tb.OnText, tbcomctl.NewMiddlewareChain(onText, nameIp.OnTextMw, ageIp.OnTextMw))
-	b.Handle(tb.OnText, form.OnTextMiddleware(func(m *tb.Message) {
-		log.Printf("onText is called: %q\nuser data: %v", m.Text, form.Data(m.Sender))
+	b.Handle(tb.OnText, form.OnTextMiddleware(func(c tb.Context) error {
+		log.Printf("onText is called: %q\nuser data: %v", c.Message().Text, form.Data(c.Sender()))
+		return nil
 	}))
 
 	b.Start()
 }
 
-func processInput(b *tb.Bot) func(context.Context, *tb.Message) error {
-	return func(ctx context.Context, m *tb.Message) error {
-		val := m.Text
+func processInput(b *tb.Bot) func(ctx context.Context, c tb.Context) error {
+	return func(ctx context.Context, c tb.Context) error {
+		val := c.Message().Text
 		log.Println("msgCb function is called, input value:", val)
 		switch val {
 		case "error":
@@ -55,7 +56,7 @@ func processInput(b *tb.Bot) func(context.Context, *tb.Message) error {
 			return tbcomctl.NewInputError("wrong input")
 		}
 		if ctrl, ok := tbcomctl.ControllerFromCtx(ctx); ok {
-			log.Println("form values so far: ", ctrl.Form().Data(m.Sender))
+			log.Println("form values so far: ", ctrl.Form().Data(c.Sender()))
 		}
 		return nil
 	}

@@ -14,40 +14,21 @@ import (
 
 	"github.com/google/uuid"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 const (
 	FallbackLang = "en-US"
 )
 const (
-	unknown = "<unknown>"
+	unknown = "[unknown]"
 )
-
-// Boter is the interface to send messages.
-type Boter interface {
-	Handle(endpoint interface{}, handler interface{})
-	Send(to tb.Recipient, what interface{}, options ...interface{}) (*tb.Message, error)
-	Edit(msg tb.Editable, what interface{}, options ...interface{}) (*tb.Message, error)
-	Respond(c *tb.Callback, resp ...*tb.CallbackResponse) error
-}
-
-type BotChecker interface {
-	Boter
-	ChatMemberOf(chat *tb.Chat, user *tb.User) (*tb.ChatMember, error)
-	ChatByID(id string) (*tb.Chat, error)
-}
-
-type BotNotifier interface {
-	Boter
-	Notify(to tb.Recipient, action tb.ChatAction) error
-}
 
 // Controller is the interface that some of the common controls implement.  Controllers can
 // be chained together
 type Controller interface {
 	// Handler is the controller's message handler.
-	Handler(m *tb.Message)
+	Handler(c tb.Context) error
 	// Name returns the name of the control assigned to it on creation.  When
 	// Controller is a part of a form, one can call Form.Controller(name) method
 	// to get the controller.
@@ -63,8 +44,6 @@ type Controller interface {
 	Form() *Form
 	// Value returns the value stored in the controller for the recipient.
 	Value(recipient string) (string, bool)
-	// Bot returns the bot that is used to inialise the controller.
-	Bot() Boter
 	// OutgoingID should return the value of the outgoing message ID for the
 	// user and true if the message is present or false otherwise.
 	OutgoingID(recipient string) (int, bool)
@@ -75,7 +54,7 @@ type overwriter interface {
 }
 
 type commonCtl struct {
-	b Boter
+	// b Boter
 
 	name string // name of the control, must be unique if used within chained controls
 	prev Controller
@@ -99,20 +78,20 @@ type commonCtl struct {
 
 // PrivateOnly is the middleware that restricts the handler to only private
 // messages.
-func PrivateOnly(fn func(m *tb.Message)) func(*tb.Message) {
-	return PrivateOnlyMsg(nil, "", fn)
+func PrivateOnly(fn tb.HandlerFunc) tb.HandlerFunc {
+	return PrivateOnlyMsg("", fn)
 }
 
-func PrivateOnlyMsg(b Boter, msg string, fn func(m *tb.Message)) func(*tb.Message) {
-	return func(m *tb.Message) {
-		if !m.Private() {
-			if !(b == nil || msg == "") {
-				pr := Printer(m.Sender.LanguageCode)
-				b.Send(m.Chat, pr.Sprintf(msg))
+func PrivateOnlyMsg(msg string, fn tb.HandlerFunc) tb.HandlerFunc {
+	return func(c tb.Context) error {
+		if !c.Message().Private() {
+			if msg != "" {
+				pr := Printer(c.Sender().LanguageCode)
+				c.Send(pr.Sprintf(msg))
 			}
-			return
+			return nil
 		}
-		fn(m)
+		return fn(c)
 	}
 }
 
@@ -138,19 +117,21 @@ func (m StoredMessage) MessageSig() (string, int64) {
 	return m.MessageID, m.ChatID
 }
 
-// TextFunc returns values for inline buttons, possibly personalised for user u.
+// ValuesFunc returns values for inline buttons, possibly personalised for user u.
 type ValuesFunc func(ctx context.Context, u *tb.User) ([]string, error)
 
 // TextFunc returns formatted text, possibly personalised for user u.
 type TextFunc func(ctx context.Context, u *tb.User) (string, error)
 
-type MiddlewareFunc func(func(m *tb.Message)) func(m *tb.Message)
+// MiddlewareFunc is the function that wraps a telebot handler and returns a handler.
+type MiddlewareFunc func(tb.HandlerFunc) tb.HandlerFunc
 
+// ErrFunc is the error processing function.
 type ErrFunc func(ctx context.Context, m *tb.Message, err error)
 
 // BtnCallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
 // ErrRetry if the retry should be performed.
-type BtnCallbackFunc func(ctx context.Context, cb *tb.Callback) error
+type BtnCallbackFunc func(ctx context.Context, c tb.Context) error
 
 type ErrType int
 
@@ -205,9 +186,8 @@ func optFallbackLang(lang string) option {
 }
 
 // newCommonCtl creates a new commonctl instance.
-func newCommonCtl(b Boter, name string, textFn TextFunc) commonCtl {
+func newCommonCtl(name string, textFn TextFunc) commonCtl {
 	return commonCtl{
-		b:        b,
 		name:     name,
 		textFn:   textFn,
 		messages: make(map[string]int),
@@ -227,7 +207,7 @@ func (c *commonCtl) register(r tb.Recipient, msgID int) uuid.UUID {
 	return reqID
 }
 
-// requestEnsure initialises that request cache is initialised.
+// requestEnsure ensures that request cache is initialised.
 func (c *commonCtl) requestEnsure(r tb.Recipient) {
 	if c.reqCache == nil {
 		c.reqCache = make(map[string]map[int]uuid.UUID)
@@ -242,14 +222,18 @@ func (c *commonCtl) requestEnsure(r tb.Recipient) {
 func (c *commonCtl) requestFor(r tb.Recipient, msgID int) (uuid.UUID, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	c.requestEnsure(r)
+
 	reqID, ok := c.reqCache[r.Recipient()][msgID]
 	return reqID, ok
 }
 
+// unregister unregisters the request from cache.
 func (c *commonCtl) unregister(r tb.Recipient, msgID int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	delete(c.reqCache[r.Recipient()], msgID)
 }
 
@@ -267,7 +251,7 @@ func (c *commonCtl) reqIDInfo(r tb.Recipient, msgID int) (string, time.Time) {
 // telegram button will have a button index pressed by the user in the
 // callback.Data. Prefix is the prefix that will be prepended to the unique
 // before hash is called to form the Control-specific unique fields.
-func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix string, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
+func (c *commonCtl) multibuttonMarkup(b *tb.Bot, btns []Button, showCounter bool, prefix string, cbFn func(tb.Context) error) *tb.ReplyMarkup {
 	const (
 		sep = ": "
 	)
@@ -280,7 +264,7 @@ func (c *commonCtl) multibuttonMarkup(btns []Button, showCounter bool, prefix st
 	for i, ri := range btns {
 		bn := markup.Data(ri.label(showCounter, sep), hash(prefix+ri.Name), strconv.Itoa(i))
 		buttons = append(buttons, bn)
-		c.b.Handle(&bn, cbFn)
+		b.Handle(&bn, cbFn)
 	}
 
 	markup.Inline(organizeButtons(buttons, defNumButtons)...)
@@ -302,7 +286,7 @@ func (c *commonCtl) SetPrev(ctrl Controller) {
 	}
 }
 
-func NewControllerChain(first Controller, cc ...Controller) func(m *tb.Message) {
+func NewControllerChain(first Controller, cc ...Controller) tb.HandlerFunc {
 	var chain Controller
 	for i := len(cc) - 1; i >= 0; i-- {
 		cc[i].SetNext(chain)
@@ -400,26 +384,22 @@ func (c *commonCtl) setOverwrite(b bool) {
 	c.overwrite = b
 }
 
-func (c *commonCtl) sendOrEdit(userMsg *tb.Message, txt string, sendOpts ...interface{}) (*tb.Message, error) {
+func (c *commonCtl) sendOrEdit(ct tb.Context, txt string, sendOpts ...interface{}) (*tb.Message, error) {
 	var outbound *tb.Message
 	var err error
 	if c.overwrite && c.prev != nil {
-		msgID, ok := c.prev.OutgoingID(userMsg.Sender.Recipient())
+		msgID, ok := c.prev.OutgoingID(ct.Sender().Recipient())
 		if !ok {
-			return nil, fmt.Errorf("%s can't find previous message ID for %s", caller(2), Userinfo(userMsg.Sender))
+			return nil, fmt.Errorf("%s can't find previous message ID for %s", caller(2), Userinfo(ct.Sender()))
 
 		}
-		prevMsg := tb.Message{ID: msgID, Chat: userMsg.Chat}
-		outbound, err = c.b.Edit(&prevMsg,
+		prevMsg := tb.Message{ID: msgID, Chat: ct.Chat()}
+		outbound, err = ct.Bot().Edit(&prevMsg,
 			txt,
 			sendOpts...,
 		)
 	} else {
-		outbound, err = c.b.Send(userMsg.Chat, txt, sendOpts...)
+		outbound, err = ct.Bot().Send(ct.Chat(), txt, sendOpts...)
 	}
 	return outbound, err
-}
-
-func (c *commonCtl) Bot() Boter {
-	return c.b
 }

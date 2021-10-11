@@ -1,7 +1,7 @@
 package tbcomctl
 
 import (
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 type Form struct {
@@ -59,8 +59,8 @@ func (fm *Form) SetRemoveButtons(b bool) *Form {
 	return fm
 }
 
-func (fm *Form) Handler(m *tb.Message) {
-	fm.ctrls[0].Handler(m)
+func (fm *Form) Handler(c tb.Context) error {
+	return fm.ctrls[0].Handler(c)
 }
 
 // Controller returns the Form Controller by it's name.
@@ -70,11 +70,11 @@ func (fm *Form) Controller(name string) (Controller, bool) {
 }
 
 type onTexter interface {
-	OnTextMw(fn func(m *tb.Message)) func(*tb.Message)
+	OnTextMw(fn tb.HandlerFunc) tb.HandlerFunc
 }
 
 // OnTextMiddleware returns the middleware for OnText handler.
-func (fm *Form) OnTextMiddleware(onText func(m *tb.Message)) func(m *tb.Message) {
+func (fm *Form) OnTextMiddleware(onText tb.HandlerFunc) tb.HandlerFunc {
 	var mwfn []MiddlewareFunc
 	for _, ctrl := range fm.ctrls {
 		otmw, ok := ctrl.(onTexter) // if the control satisfies onTexter, it contains middleware function
@@ -86,7 +86,7 @@ func (fm *Form) OnTextMiddleware(onText func(m *tb.Message)) func(m *tb.Message)
 	return middlewareChain(onText, mwfn...)
 }
 
-func middlewareChain(final func(m *tb.Message), mw ...MiddlewareFunc) func(m *tb.Message) {
+func middlewareChain(final tb.HandlerFunc, mw ...MiddlewareFunc) tb.HandlerFunc {
 	var handler = final
 	for i := len(mw) - 1; i >= 0; i-- {
 		handler = mw[i](handler)

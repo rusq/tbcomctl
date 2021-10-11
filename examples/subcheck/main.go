@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/rusq/tbcomctl"
-	tb "gopkg.in/tucnak/telebot.v2"
+	"github.com/rusq/osenv"
+	"github.com/rusq/tbcomctl/v3"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 var _ = godotenv.Load()
 
 var (
 	token = os.Getenv("TOKEN")
-	chat  = os.Getenv("CHAT")
+	chat  = osenv.Int64("CHAT", 0)
 )
 
 func main() {
@@ -27,7 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sc := tbcomctl.NewSubChecker(b, "sc", tbcomctl.TextFn("test sub"), []string{chat})
+	sc := tbcomctl.NewSubChecker("sc", tbcomctl.TextFn("test sub"), []int64{chat})
 
 	b.Handle("/subcheck", sc.Handler)
 

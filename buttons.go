@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 type buttons struct {
@@ -20,8 +20,7 @@ func (b *buttons) SetMaxButtons(n int) {
 
 type PostButtons struct {
 	*buttons
-	b    Boter
-	cbFn func(cb *tb.Callback)
+	cbFn tb.HandlerFunc
 }
 
 type PBOption func(*PostButtons)
@@ -35,9 +34,8 @@ func PBOptMaxButtons(n int) PBOption {
 // NewPostButtons creates an instance of PostButtons.  The callbackFunction is
 // the function that will be assigned and called for each button press, so it
 // should handle all possible values.
-func NewPostButtons(b Boter, callbackFn func(cb *tb.Callback), opts ...PBOption) *PostButtons {
+func NewPostButtons(callbackFn func(c tb.Context) error, opts ...PBOption) *PostButtons {
 	pb := &PostButtons{
-		b:       b,
 		cbFn:    callbackFn,
 		buttons: &buttons{maxButtons: defNumButtons},
 	}
@@ -48,11 +46,11 @@ func NewPostButtons(b Boter, callbackFn func(cb *tb.Callback), opts ...PBOption)
 }
 
 // Markup returns the markup with buttons labeled with labels.
-func (pb *PostButtons) Markup(labels []string, pattern ...uint) (*tb.ReplyMarkup, error) {
+func (pb *PostButtons) Markup(c tb.Context, labels []string, pattern ...uint) (*tb.ReplyMarkup, error) {
 	if len(pattern) == 0 {
-		return ButtonMarkup(pb.b, labels, pb.maxButtons, pb.cbFn), nil
+		return ButtonMarkup(c, labels, pb.maxButtons, pb.cbFn), nil
 	}
-	markup, err := ButtonPatternMarkup(pb.b, labels, pattern, pb.cbFn)
+	markup, err := ButtonPatternMarkup(c, labels, pattern, pb.cbFn)
 	if err != nil {
 		panic(err)
 	}
@@ -62,17 +60,17 @@ func (pb *PostButtons) Markup(labels []string, pattern ...uint) (*tb.ReplyMarkup
 // ButtonMarkup returns the button markup for the message.  It creates handlers
 // for all the buttons assigning the cbFn callback function to each of them.
 // Values must be unique.  maxRowButtons is maximum number of buttons in a row.
-func ButtonMarkup(b Boter, values []string, maxRowButtons int, cbFn func(*tb.Callback)) *tb.ReplyMarkup {
+func ButtonMarkup(c tb.Context, values []string, maxRowButtons int, cbFn func(c tb.Context) error) *tb.ReplyMarkup {
 	if maxRowButtons <= 0 || defNumButtons < maxRowButtons {
 		maxRowButtons = defNumButtons
 	}
-	markup, btns := createButtons(b, values, cbFn)
+	markup, btns := createButtons(c, values, cbFn)
 	markup.Inline(organizeButtons(btns, maxRowButtons)...)
 	return markup
 }
 
-func ButtonPatternMarkup(b Boter, values []string, pattern []uint, cbFn func(*tb.Callback)) (*tb.ReplyMarkup, error) {
-	markup, btns := createButtons(b, values, cbFn)
+func ButtonPatternMarkup(c tb.Context, values []string, pattern []uint, cbFn func(c tb.Context) error) (*tb.ReplyMarkup, error) {
+	markup, btns := createButtons(c, values, cbFn)
 	rows, err := organizeButtonsPattern(btns, pattern)
 	if err != nil {
 		return nil, err
@@ -81,13 +79,13 @@ func ButtonPatternMarkup(b Boter, values []string, pattern []uint, cbFn func(*tb
 	return markup, nil
 }
 
-func createButtons(b Boter, values []string, cbFn func(*tb.Callback)) (*tb.ReplyMarkup, []tb.Btn) {
+func createButtons(c tb.Context, values []string, cbFn func(c tb.Context) error) (*tb.ReplyMarkup, []tb.Btn) {
 	markup := new(tb.ReplyMarkup)
 	var btns []tb.Btn
 	for _, label := range values {
 		btn := markup.Data(label, hash(label), label)
 		btns = append(btns, btn)
-		b.Handle(&btn, cbFn)
+		c.Bot().Handle(&btn, cbFn)
 	}
 	return markup, btns
 }

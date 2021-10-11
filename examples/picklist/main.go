@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/rusq/tbcomctl"
-	tb "gopkg.in/tucnak/telebot.v2"
+	"github.com/rusq/tbcomctl/v3"
+	tb "gopkg.in/tucnak/telebot.v3"
 )
 
 var _ = godotenv.Load()
@@ -28,31 +28,30 @@ func main() {
 		log.Fatal(err)
 	}
 	p1 := tbcomctl.NewPicklistText(
-		b,
 		"1",
 		"first picklist",
 		[]string{"1", "2", "3", "4"},
-		func(ctx context.Context, cb *tb.Callback) error {
-			fmt.Println(tbcomctl.Sdump(cb))
+		func(ctx context.Context, c tb.Context) error {
+			fmt.Println(tbcomctl.Sdump(c.Callback()))
 			return nil
 		},
 	)
 	p2 := tbcomctl.NewPicklistText(
-		b,
 		"2",
 		"second picklist",
 		[]string{"5", "6", "7", "8"},
-		func(ctx context.Context, cb *tb.Callback) error {
-			fmt.Println(tbcomctl.Sdump(cb))
+		func(ctx context.Context, c tb.Context) error {
+			fmt.Println(tbcomctl.Sdump(c.Callback()))
 			return nil
 		},
 		tbcomctl.PickOptBtnPattern([]uint{1, 2, 1}),
 	)
-	m := tbcomctl.NewMessageText(b, "msg", "all ok")
+	m := tbcomctl.NewMessageText("msg", "all ok")
 	form := tbcomctl.NewForm(p1, p2, m).
 		SetOverwrite(true).
 		SetRemoveButtons(true)
 	b.Handle("/picklist", form.Handler)
 
+	log.Println("ready, send /picklist")
 	b.Start()
 }

@@ -136,7 +136,7 @@ func (p *Picklist) Handler(c tb.Context) error {
 		return nil
 	}
 	ctrlCtx := WithController(context.Background(), p)
-	values, err := p.vFn(ctrlCtx, m.Sender)
+	values, err := p.vFn(ctrlCtx, c.Sender())
 	if err != nil {
 		p.processErr(c, err)
 		return err
@@ -146,7 +146,7 @@ func (p *Picklist) Handler(c tb.Context) error {
 	markup := p.inlineMarkup(c, values)
 	// send message with markup
 	pr := Printer(c.Sender().LanguageCode, p.lang)
-	text, err := p.textFn(WithController(context.Background(), p), m.Sender)
+	text, err := p.textFn(WithController(context.Background(), p), c.Sender())
 	if err != nil {
 		c.Send(pr.Sprintf(MsgUnexpected))
 		return fmt.Errorf("error while generating text for controller: %s: %w", p.name, err)
@@ -205,8 +205,7 @@ func (p *Picklist) Callback(c tb.Context) error {
 }
 
 func (p *Picklist) editMsg(ctx context.Context, c tb.Context) bool {
-	cb := c.Callback()
-	text, err := p.textFn(WithController(ctx, p), cb.Sender)
+	text, err := p.textFn(WithController(ctx, p), c.Sender())
 	if err != nil {
 		lg.Println(err)
 		trace.Log(ctx, "textFn", err.Error())
@@ -228,7 +227,7 @@ func (p *Picklist) editMsg(ctx context.Context, c tb.Context) bool {
 		return true
 	}
 
-	values, err := p.vFn(WithController(ctx, p), cb.Sender)
+	values, err := p.vFn(WithController(ctx, p), c.Sender())
 	if err != nil {
 		trace.Log(ctx, "vFn", err.Error())
 		p.processErr(c, err)
@@ -237,7 +236,7 @@ func (p *Picklist) editMsg(ctx context.Context, c tb.Context) bool {
 
 	markup := p.inlineMarkup(c, values)
 	if err := c.Edit(
-		p.format(cb.Sender, text),
+		p.format(c.Sender(), text),
 		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
 	); err != nil {
 		lg.Println(err)
@@ -275,7 +274,7 @@ func (p *Picklist) processErr(c tb.Context, err error) {
 	} else {
 		m = c.Message()
 	}
-	pr := Printer(m.Sender.LanguageCode, p.lang)
+	pr := Printer(c.Sender().LanguageCode, p.lang)
 	lg.Println(err)
 	if p.errFn == nil {
 		c.Send(pr.Sprintf(MsgUnexpected))

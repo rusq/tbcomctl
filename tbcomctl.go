@@ -133,29 +133,6 @@ type ErrFunc func(ctx context.Context, m *tb.Message, err error)
 // ErrRetry if the retry should be performed.
 type BtnCallbackFunc func(ctx context.Context, c tb.Context) error
 
-type ErrType int
-
-const (
-	TErrNoChange ErrType = iota
-	TErrRetry
-	TInputError
-)
-
-type Error struct {
-	Alert bool
-	Msg   string
-	Type  ErrType
-}
-
-func (e *Error) Error() string { return e.Msg }
-
-var (
-	// ErrRetry should be returned by CallbackFunc if the retry should be performed.
-	ErrRetry = &Error{Type: TErrRetry, Msg: "retry", Alert: true}
-	// ErrNoChange should be returned if the user picked the same value as before, and no update needed.
-	ErrNoChange = &Error{Type: TErrNoChange, Msg: "no change"}
-)
-
 var hasher = sha1.New
 
 func hash(s string) string {
@@ -387,12 +364,8 @@ func (c *commonCtl) setOverwrite(b bool) {
 func (c *commonCtl) sendOrEdit(ct tb.Context, txt string, sendOpts ...interface{}) (*tb.Message, error) {
 	var outbound *tb.Message
 	var err error
-	if c.overwrite && c.prev != nil {
-		msgID, ok := c.prev.OutgoingID(ct.Sender().Recipient())
-		if !ok {
-			return nil, fmt.Errorf("%s can't find previous message ID for %s", caller(2), Userinfo(ct.Sender()))
-
-		}
+	msgID, ok := c.getPreviousMsgID(ct)
+	if c.overwrite && ok {
 		prevMsg := tb.Message{ID: msgID, Chat: ct.Chat()}
 		outbound, err = ct.Bot().Edit(&prevMsg,
 			txt,
@@ -402,4 +375,22 @@ func (c *commonCtl) sendOrEdit(ct tb.Context, txt string, sendOpts ...interface{
 		outbound, err = ct.Bot().Send(ct.Chat(), txt, sendOpts...)
 	}
 	return outbound, err
+}
+
+func (c *commonCtl) getPreviousMsgID(ct tb.Context) (int, bool) {
+	backPressed, ok := ct.Get(BackPressed.Error()).(bool)
+	if ok && backPressed {
+		ct.Set(BackPressed.Error(), false) // reset the context value
+		if c.next == nil {
+			// internal error
+			return 0, false
+		}
+		return c.next.OutgoingID(ct.Sender().Recipient())
+	}
+	// back not pressed
+	if c.prev == nil {
+		return 0, false
+	}
+	return c.prev.OutgoingID(ct.Sender().Recipient())
+
 }

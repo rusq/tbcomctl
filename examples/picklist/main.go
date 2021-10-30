@@ -39,15 +39,29 @@ func main() {
 	p2 := tbcomctl.NewPicklistText(
 		"2",
 		"second picklist",
-		[]string{"5", "6", "7", "8"},
+		[]string{"5", "6", "7", "8", "back"},
+		func(ctx context.Context, c tb.Context) error {
+			fmt.Println(tbcomctl.Sdump(c.Callback()))
+			if c.Data() == "back" {
+				return tbcomctl.BackPressed
+			}
+			return nil
+		},
+		tbcomctl.PickOptBtnPattern([]uint{1, 2, 1, 1}),
+	)
+	p3 := tbcomctl.NewPicklistText(
+		"3",
+		"picklist with back button option",
+		[]string{"9", "A", "B", "C"},
 		func(ctx context.Context, c tb.Context) error {
 			fmt.Println(tbcomctl.Sdump(c.Callback()))
 			return nil
 		},
 		tbcomctl.PickOptBtnPattern([]uint{1, 2, 1}),
+		tbcomctl.PickOptBtnBackWithText("option back"),
 	)
 	m := tbcomctl.NewMessageText("msg", "all ok")
-	form := tbcomctl.NewForm(p1, p2, m).
+	form := tbcomctl.NewForm(p1, p2, p3, m).
 		SetOverwrite(true).
 		SetRemoveButtons(true)
 	b.Handle("/picklist", form.Handler)

@@ -7,6 +7,7 @@ import (
 	"runtime/trace"
 	"strings"
 
+	"github.com/rusq/dlog"
 	tb "gopkg.in/tucnak/telebot.v3"
 )
 
@@ -22,9 +23,11 @@ type Picklist struct {
 	removeButtons bool
 	noUpdate      bool
 	msgChoose     bool
+	backBtn       bool
 
-	vFn  ValuesFunc
-	cbFn BtnCallbackFunc
+	vFn       ValuesFunc
+	cbFn      BtnCallbackFunc
+	backTxtFn TextFunc
 
 	btnPattern []uint
 }
@@ -103,6 +106,19 @@ func PickOptBtnPattern(pattern []uint) PicklistOption {
 	}
 }
 
+func PickOptBtnBack(textFn TextFunc) PicklistOption {
+	return func(p *Picklist) {
+		p.backBtn = true
+		p.backTxtFn = textFn
+	}
+}
+
+func PickOptBtnBackWithText(s string) PicklistOption {
+	return PickOptBtnBack(func(ctx context.Context, u *tb.User) (string, error) {
+		return s, nil
+	})
+}
+
 // NewPicklist creates a new picklist.
 func NewPicklist(name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
 	if textFn == nil || valuesFn == nil || callbackFn == nil {
@@ -116,6 +132,9 @@ func NewPicklist(name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn B
 	}
 	for _, opt := range opts {
 		opt(p)
+	}
+	if p.backBtn {
+		p.btnPattern = append(p.btnPattern, 1)
 	}
 	return p
 }
@@ -170,17 +189,25 @@ func (p *Picklist) Callback(c tb.Context) error {
 	p.logCallback(cb)
 
 	var resp tb.CallbackResponse
+
+	if p.backBtn {
+		// back button is enabled, check if the callback data contains back button text.
+		txt, err := p.backTxtFn(ctx, c.Sender())
+		if err != nil {
+			trace.Logf(ctx, "back button", "err=%s", err)
+		}
+		if c.Data() == txt {
+			trace.Log(ctx, "callback", "back is pressed (option)")
+			return p.handleBackButton(ctx, c)
+		}
+	}
+
 	err := p.cbFn(WithController(ctx, p), c)
 	if err != nil {
 		if errors.Is(err, BackPressed) {
-			// Back button is pressed.
-			if err := c.Respond(&tb.CallbackResponse{}); err != nil {
-				trace.Log(ctx, "respond", err.Error())
-			}
-			if p.prev != nil {
-				p.prev.Handler(c)
-			}
-			return nil
+			// user callback function might return "back button is pressed" as well
+			trace.Log(ctx, "callback", "back is pressed (user)")
+			return p.handleBackButton(ctx, c)
 		}
 		if e, ok := err.(*Error); !ok {
 			p.editMsg(ctx, c)
@@ -266,6 +293,13 @@ func (p *Picklist) format(u *tb.User, text string) string {
 }
 
 func (p *Picklist) inlineMarkup(c tb.Context, values []string) *tb.ReplyMarkup {
+	if p.backBtn {
+		txt, err := p.backTxtFn(context.Background(), c.Sender())
+		if err != nil {
+			dlog.Debugf("backTextFn returned an error: %s", err)
+		}
+		values = append(values, txt)
+	}
 	if len(p.btnPattern) == 0 {
 		return ButtonMarkup(c, values, p.maxButtons, p.Callback)
 	}
@@ -304,6 +338,17 @@ func convertToMsg(cb *tb.Callback) *tb.Message {
 func (p *Picklist) nextHandler(c tb.Context) error {
 	if p.next != nil {
 		return p.next.Handler(c)
+	}
+	return nil
+}
+
+func (p *Picklist) handleBackButton(ctx context.Context, c tb.Context) error {
+	if err := c.Respond(&tb.CallbackResponse{}); err != nil {
+		trace.Log(ctx, "respond", err.Error())
+	}
+	c.Set(BackPressed.Error(), true)
+	if p.prev != nil {
+		return p.prev.Handler(c)
 	}
 	return nil
 }

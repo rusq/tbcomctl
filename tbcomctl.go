@@ -133,29 +133,6 @@ type ErrFunc func(ctx context.Context, m *tb.Message, err error)
 // ErrRetry if the retry should be performed.
 type BtnCallbackFunc func(ctx context.Context, c tb.Context) error
 
-type ErrType int
-
-const (
-	TErrNoChange ErrType = iota
-	TErrRetry
-	TInputError
-)
-
-type Error struct {
-	Alert bool
-	Msg   string
-	Type  ErrType
-}
-
-func (e *Error) Error() string { return e.Msg }
-
-var (
-	// ErrRetry should be returned by CallbackFunc if the retry should be performed.
-	ErrRetry = &Error{Type: TErrRetry, Msg: "retry", Alert: true}
-	// ErrNoChange should be returned if the user picked the same value as before, and no update needed.
-	ErrNoChange = &Error{Type: TErrNoChange, Msg: "no change"}
-)
-
 var hasher = sha1.New
 
 func hash(s string) string {

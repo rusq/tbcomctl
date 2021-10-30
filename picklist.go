@@ -2,6 +2,7 @@ package tbcomctl
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime/trace"
 	"strings"
@@ -171,10 +172,20 @@ func (p *Picklist) Callback(c tb.Context) error {
 	var resp tb.CallbackResponse
 	err := p.cbFn(WithController(ctx, p), c)
 	if err != nil {
+		if errors.Is(err, BackPressed) {
+			// Back button is pressed.
+			if err := c.Respond(&tb.CallbackResponse{}); err != nil {
+				trace.Log(ctx, "respond", err.Error())
+			}
+			if p.prev != nil {
+				p.prev.Handler(c)
+			}
+			return nil
+		}
 		if e, ok := err.(*Error); !ok {
 			p.editMsg(ctx, c)
 			if err := c.Respond(&tb.CallbackResponse{Text: err.Error(), ShowAlert: true}); err != nil {
-				trace.Logf(ctx, "respond", err.Error())
+				trace.Log(ctx, "respond", err.Error())
 			}
 			p.unregister(c.Sender(), cb.Message.ID)
 			return e
@@ -292,7 +303,6 @@ func convertToMsg(cb *tb.Callback) *tb.Message {
 
 func (p *Picklist) nextHandler(c tb.Context) error {
 	if p.next != nil {
-		// this call is part of the pipeline
 		return p.next.Handler(c)
 	}
 	return nil

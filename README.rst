@@ -26,9 +26,11 @@ Installation
 ============
 
 For Telebot_ v3::
+  
   go get github.com/rusq/tbcomctl/v3
 
 For Telebot_ v2::
+  
   go get github.com/rusq/tbcomctl
   // or
   go get github.com/rusq/tbcomctl/v2

@@ -7,14 +7,15 @@ import (
 	tb "gopkg.in/tucnak/telebot.v3"
 )
 
-// Message is the controller that sends a message.
+// Message is the controller that sends a message.  It can be used to send a
+// confirmation message at the end of the Form.
 type Message struct {
 	commonCtl
 	txt  Texter
 	opts []interface{}
 }
 
-var _ Controller = &Message{}
+var _ Controller = &Message{} // assertion
 
 // NewMessage creates new Message Controller.  One must pass Bot instance, name
 // of the controller, text function that returns the desired message and

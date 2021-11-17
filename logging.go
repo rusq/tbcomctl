@@ -18,10 +18,12 @@ const (
 	chatPrivate  = "private"
 )
 
-// lg is the package logger.
-var lg Logger = dlog.FromContext(context.Background()) // getting default logger
-// dlg is the debug logger.
-var dlg Logger = nologger{}
+var (
+	// lg is the package logger.
+	lg Logger = dlog.FromContext(context.Background()) // getting default logger
+	// dlg is the debug logger.
+	dlg Logger = blackholeLogger{}
+)
 
 // Logger is the interface for logging.
 type Logger interface {
@@ -94,7 +96,7 @@ func SetDebugLogger(l Logger) {
 
 // NoDebugLogger switches off debug messages.
 func NoDebugLogger() {
-	dlg = nologger{}
+	dlg = blackholeLogger{}
 }
 
 // GetLogger returns current logger.
@@ -104,14 +106,15 @@ func GetLogger() Logger {
 
 // NoLogging switches off default logging, if you're brave.
 func NoLogging() {
-	lg = nologger{}
+	lg = blackholeLogger{}
 }
 
-type nologger struct{}
+// blackholeLogger is the logger that outputs nothing.
+type blackholeLogger struct{}
 
-func (nologger) Print(v ...interface{})                 {}
-func (nologger) Println(v ...interface{})               {}
-func (nologger) Printf(format string, a ...interface{}) {}
+func (blackholeLogger) Print(v ...interface{})                 {}
+func (blackholeLogger) Println(v ...interface{})               {}
+func (blackholeLogger) Printf(format string, a ...interface{}) {}
 
 // logCallback logs callback data.
 func (cc *commonCtl) logCallback(cb *tb.Callback) {

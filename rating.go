@@ -2,7 +2,7 @@ package tbcomctl
 
 import (
 	"errors"
-	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 
@@ -44,31 +44,13 @@ type RatingType int
 
 func NewRating(fn RatingFunc, opts ...RBOption) *Rating {
 	rb := &Rating{
-		commonCtl: commonCtl{},
+		commonCtl: newCommonCtl("rating"),
 		rateFn:    fn,
 	}
 	for _, opt := range opts {
 		opt(rb)
 	}
 	return rb
-}
-
-type Button struct {
-	Name  string `json:"n"`
-	Value int    `json:"v"`
-}
-
-// label outputs the label for the ratingInfo.  If counter is set, will output a
-// decimal representation of value after a separator sep.
-func (ri *Button) label(counter bool, sep string) string {
-	if !counter {
-		return ri.Name
-	}
-	return ri.Name + sep + strconv.FormatInt(int64(ri.Value), 10)
-}
-
-func (ri *Button) String() string {
-	return fmt.Sprintf("<Button name: %s, value: %d>", ri.Name, ri.Value)
 }
 
 func (rb *Rating) Markup(b *tb.Bot, btns [2]Button) *tb.ReplyMarkup {
@@ -81,7 +63,8 @@ var ErrAlreadyVoted = errors.New("already voted")
 func (rb *Rating) callback(c tb.Context) error {
 	respErr := tb.CallbackResponse{Text: MsgUnexpected}
 	data := c.Data()
-	i, err := strconv.Atoi(data)
+
+	btnIdx, err := strconv.Atoi(data)
 	if err != nil {
 		lg.Printf("failed to get the button index from data: %s", data)
 		c.Respond(&respErr)
@@ -89,7 +72,7 @@ func (rb *Rating) callback(c tb.Context) error {
 	}
 
 	// get existing value for the post
-	buttons, valErr := rb.rateFn(c.Message(), c.Sender(), i)
+	buttons, valErr := rb.rateFn(c.Message(), c.Sender(), btnIdx)
 	if valErr != nil && valErr != ErrAlreadyVoted {
 		lg.Printf("failed to get the data from the rating callback: %s", valErr)
 		dlg.Printf("callback: %s", Sdump(c.Callback()))
@@ -101,7 +84,8 @@ func (rb *Rating) callback(c tb.Context) error {
 	// update the post with new buttons
 	if valErr != ErrAlreadyVoted {
 		if err := c.Edit(rb.Markup(c.Bot(), buttons)); err != nil {
-			if e, ok := err.(*tb.APIError); ok && e.Code == 400 && strings.Contains(e.Description, "exactly the same") {
+			if e, ok := err.(*tb.APIError); ok && e.Code == http.StatusBadRequest && strings.Contains(e.Description, "exactly the same") {
+				// same button pressed - not an error.
 				lg.Printf("%s: same button pressed", Userinfo(c.Sender()))
 			} else {
 				lg.Printf("failed to edit the message: %v: %s", c.Message(), err)
@@ -109,7 +93,7 @@ func (rb *Rating) callback(c tb.Context) error {
 				return err
 			}
 		}
-		msg = MsgVoteCounted
+		msg = PrinterContext(c, rb.fallbackLang).Sprint(MsgVoteCounted)
 	}
 
 	return c.Respond(&tb.CallbackResponse{Text: msg})

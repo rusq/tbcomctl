@@ -3,9 +3,29 @@ package tbcomctl
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	tb "gopkg.in/tucnak/telebot.v3"
 )
+
+// Button is the control button.
+type Button struct {
+	Name  string `json:"n"`
+	Value int    `json:"v"`
+}
+
+// label outputs the label for the ratingInfo.  If counter is set, will output a
+// decimal representation of value after a separator sep.
+func (b *Button) label(showCounter bool, sep string) string {
+	if showCounter {
+		return b.Name + sep + strconv.FormatInt(int64(b.Value), 10)
+	}
+	return b.Name
+}
+
+func (b *Button) String() string {
+	return fmt.Sprintf("<Button name: %s, value: %d>", b.Name, b.Value)
+}
 
 type buttons struct {
 	maxButtons int

@@ -7,7 +7,6 @@ import (
 	"runtime/trace"
 	"strings"
 
-	"github.com/rusq/dlog"
 	tb "gopkg.in/tucnak/telebot.v3"
 )
 
@@ -25,9 +24,8 @@ type Picklist struct {
 	msgChoose     bool
 	backBtn       bool
 
-	vFn       ValuesFunc
-	cbFn      BtnCallbackFunc
-	backTxtFn TextFunc
+	tvc        TextValueCallbacker
+	backBtnTxt Texter
 
 	btnPattern []uint
 }
@@ -46,7 +44,7 @@ func PickOptRemoveButtons(b bool) PicklistOption {
 
 func PickOptOverwrite(b bool) PicklistOption {
 	return func(p *Picklist) {
-		p.overwrite = b
+		p.commonCtl.setOverwrite(b)
 	}
 }
 
@@ -64,9 +62,9 @@ func PickOptPrivateOnly(b bool) PicklistOption {
 	}
 }
 
-func PickOptErrFunc(fn ErrFunc) PicklistOption {
+func PickOptErrHandler(h ErrorHandler) PicklistOption {
 	return func(p *Picklist) {
-		optErrFunc(fn)(&p.commonCtl)
+		optErrFunc(h)(&p.commonCtl)
 	}
 }
 
@@ -106,28 +104,25 @@ func PickOptBtnPattern(pattern []uint) PicklistOption {
 	}
 }
 
-func PickOptBtnBack(textFn TextFunc) PicklistOption {
+func PickOptBtnBack(texter Texter) PicklistOption {
 	return func(p *Picklist) {
 		p.backBtn = true
-		p.backTxtFn = textFn
+		p.backBtnTxt = texter
 	}
 }
 
-func PickOptBtnBackWithText(s string) PicklistOption {
-	return PickOptBtnBack(func(ctx context.Context, u *tb.User) (string, error) {
-		return s, nil
-	})
+// PickOptDefaultSendOptions allows to set the default send options
+func PickOptDefaultSendOptions(opts *tb.SendOptions) PicklistOption {
+	return func(p *Picklist) {
+		optDefaultSendOpts(opts)(&p.commonCtl)
+	}
 }
 
 // NewPicklist creates a new picklist.
-func NewPicklist(name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
-	if textFn == nil || valuesFn == nil || callbackFn == nil {
-		panic("one or more of the functions not set")
-	}
+func NewPicklist(name string, tvc TextValueCallbacker, opts ...PicklistOption) *Picklist {
 	p := &Picklist{
-		commonCtl: newCommonCtl(name, textFn),
-		vFn:       valuesFn,
-		cbFn:      callbackFn,
+		commonCtl: newCommonCtl(name),
+		tvc:       tvc,
 		buttons:   &buttons{maxButtons: defNumButtons},
 	}
 	for _, opt := range opts {
@@ -139,49 +134,50 @@ func NewPicklist(name string, textFn TextFunc, valuesFn ValuesFunc, callbackFn B
 	return p
 }
 
-// NewPicklistText is a convenience function to return picklist with fixed text and values.
-func NewPicklistText(name string, text string, values []string, callbackFn BtnCallbackFunc, opts ...PicklistOption) *Picklist {
-	return NewPicklist(
-		name,
-		TextFn(text),
-		func(ctx context.Context, u *tb.User) ([]string, error) { return values, nil },
-		callbackFn,
-		opts...,
-	)
-}
-
+// Handler is a handler function to use with telebot.Handle.
 func (p *Picklist) Handler(c tb.Context) error {
 	m := c.Message()
 	if p.privateOnly && !m.Private() {
+		// skips handling if we're set to operate in private mode.
 		return nil
 	}
+
 	ctrlCtx := WithController(context.Background(), p)
-	values, err := p.vFn(ctrlCtx, c.Sender())
+
+	values, err := p.tvc.Values(ctrlCtx, c)
 	if err != nil {
 		p.processErr(c, err)
 		return err
 	}
 
-	// generate markup
-	markup := p.inlineMarkup(c, values)
 	// send message with markup
-	pr := Printer(c.Sender().LanguageCode, p.lang)
-	text, err := p.textFn(WithController(context.Background(), p), c.Sender())
+	text, err := p.tvc.Text(ctrlCtx, c)
 	if err != nil {
-		c.Send(pr.Sprintf(MsgUnexpected))
+		c.Send(unexpectedErrorText(c))
 		return fmt.Errorf("error while generating text for controller: %s: %w", p.name, err)
 	}
-	// if overwrite is true and prev is not nil - edit, otherwise - send.
-	outbound, err := p.sendOrEdit(c, text, &tb.SendOptions{ReplyMarkup: markup, ParseMode: tb.ModeHTML})
+
+	outbound, err := p.sendOrEdit(c, text, p.withMarkup(p.inlineMarkup(c, values)))
 	if err != nil {
 		return err
 	}
-	_ = p.register(c.Sender(), outbound.ID)
+	_ = p.reg.Register(c.Sender(), outbound.ID)
+
 	p.logOutgoingMsg(outbound, fmt.Sprintf("picklist: %q", strings.Join(values, "*")))
+
 	return nil
 }
 
-func (p *Picklist) Callback(c tb.Context) error {
+// withMarkup adds a markup to default send options.
+func (cc *commonCtl) withMarkup(markup *tb.ReplyMarkup) *tb.SendOptions {
+	var opts tb.SendOptions
+	opts = *cc.sendOpts
+	opts.ReplyMarkup = markup
+	return &opts
+}
+
+// callback is the callback function that will be registered for the buttons.
+func (p *Picklist) callback(c tb.Context) error {
 	ctx, task := trace.NewTask(context.Background(), "Picklist.Callback")
 	defer task.End()
 
@@ -192,7 +188,7 @@ func (p *Picklist) Callback(c tb.Context) error {
 
 	if p.backBtn {
 		// back button is enabled, check if the callback data contains back button text.
-		txt, err := p.backTxtFn(ctx, c.Sender())
+		txt, err := p.backBtnTxt.Text(ctx, c)
 		if err != nil {
 			trace.Logf(ctx, "back button", "err=%s", err)
 		}
@@ -202,7 +198,7 @@ func (p *Picklist) Callback(c tb.Context) error {
 		}
 	}
 
-	err := p.cbFn(WithController(ctx, p), c)
+	err := p.tvc.Callback(WithController(ctx, p), c)
 	if err != nil {
 		if errors.Is(err, BackPressed) {
 			// user callback function might return "back button is pressed" as well
@@ -211,10 +207,11 @@ func (p *Picklist) Callback(c tb.Context) error {
 		}
 		if e, ok := err.(*Error); !ok {
 			p.editMsg(ctx, c)
-			if err := c.Respond(&tb.CallbackResponse{Text: err.Error(), ShowAlert: true}); err != nil {
+			pr := PrinterContext(c, p.fallbackLang)
+			if err := c.Respond(&tb.CallbackResponse{Text: pr.Sprintf(MsgUnexpected), ShowAlert: true}); err != nil {
 				trace.Log(ctx, "respond", err.Error())
 			}
-			p.unregister(c.Sender(), cb.Message.ID)
+			p.reg.Unregister(c.Sender(), cb.Message.ID)
 			return e
 		} else {
 			switch e.Type {
@@ -233,77 +230,78 @@ func (p *Picklist) Callback(c tb.Context) error {
 
 	p.SetValue(c.Sender().Recipient(), cb.Data)
 	// edit message
-	p.editMsg(ctx, c)
+	if err := p.editMsg(ctx, c); err != nil {
+		lg.Printf("%s: error editing message: %s", caller(0), err)
+	}
 	if err := c.Respond(&resp); err != nil {
 		trace.Log(ctx, "respond", err.Error())
 	}
 	err = p.nextHandler(c)
-	p.unregister(c.Sender(), cb.Message.ID)
+	p.reg.Unregister(c.Sender(), cb.Message.ID)
 	return err
 }
 
-func (p *Picklist) editMsg(ctx context.Context, c tb.Context) bool {
-	text, err := p.textFn(WithController(ctx, p), c.Sender())
+// editMsg edits the existing message, returning true, if the message was edited without errors.
+func (p *Picklist) editMsg(ctx context.Context, c tb.Context) error {
+	text, err := p.tvc.Text(WithController(ctx, p), c)
 	if err != nil {
-		lg.Println(err)
-		trace.Log(ctx, "textFn", err.Error())
-		return false
+		trace.Log(ctx, "editMsg", err.Error())
+		return err
 	}
 
 	if p.removeButtons {
 		if err := c.Edit(
 			text,
-			&tb.SendOptions{ParseMode: tb.ModeHTML},
+			p.sendOpts,
 		); err != nil {
-			lg.Println(err)
 			trace.Log(ctx, "Edit", err.Error())
-			return false
+			return err
 		}
-		return true
+		return nil
 	}
 	if p.noUpdate {
-		return true
+		return nil
 	}
 
-	values, err := p.vFn(WithController(ctx, p), c.Sender())
+	values, err := p.tvc.Values(WithController(ctx, p), c)
 	if err != nil {
 		trace.Log(ctx, "vFn", err.Error())
 		p.processErr(c, err)
-		return false
+		return err
 	}
 
-	markup := p.inlineMarkup(c, values)
 	if err := c.Edit(
 		p.format(c.Sender(), text),
-		&tb.SendOptions{ParseMode: tb.ModeHTML, ReplyMarkup: markup},
+		p.commonCtl.withMarkup(p.inlineMarkup(c, values)),
 	); err != nil {
-		lg.Println(err)
-		return false
+		return err
 	}
 
-	return true
+	return nil
 }
 
+// format formats the text for the user.
 func (p *Picklist) format(u *tb.User, text string) string {
 	if p.msgChoose {
-		pr := Printer(u.LanguageCode, p.lang)
+		pr := Printer(u.LanguageCode, p.fallbackLang)
 		text = pr.Sprintf("%s\n\n%s", text, pr.Sprintf(MsgChooseVal))
 	}
 	return text
 }
 
+// inlineMarkup generates the inline markup for the values.
 func (p *Picklist) inlineMarkup(c tb.Context, values []string) *tb.ReplyMarkup {
 	if p.backBtn {
-		txt, err := p.backTxtFn(context.Background(), c.Sender())
+		txt, err := p.backBtnTxt.Text(context.Background(), c)
 		if err != nil {
-			dlog.Debugf("backTextFn returned an error: %s", err)
+			dlg.Println("backTextFn returned an error: %s", err)
 		}
 		values = append(values, txt)
 	}
 	if len(p.btnPattern) == 0 {
-		return ButtonMarkup(c, values, p.maxButtons, p.Callback)
+		return ButtonMarkup(c, values, p.maxButtons, p.callback)
 	}
-	m, err := ButtonPatternMarkup(c, values, p.btnPattern, p.Callback)
+	m, err := ButtonPatternMarkup(c, values, p.btnPattern, p.callback)
 	if err != nil {
 		panic(err) // TODO handle this more gracefully.
 	}
@@ -313,28 +311,25 @@ func (p *Picklist) inlineMarkup(c tb.Context, values []string) *tb.ReplyMarkup {
 // processErr logs the error, and if the error handling function errFn is not
 // nil, invokes it.
 func (p *Picklist) processErr(c tb.Context, err error) {
-	var m *tb.Message
-	if cb := c.Callback(); cb != nil {
-		m = convertToMsg(cb)
-	} else {
-		m = c.Message()
-	}
-	pr := Printer(c.Sender().LanguageCode, p.lang)
-	lg.Println(err)
-	if p.errFn == nil {
-		c.Send(pr.Sprintf(MsgUnexpected))
-	} else {
+	pr := PrinterContext(c, p.fallbackLang)
+	lg.Printf("processing error: %s", err)
+	if eh, ok := p.tvc.(ErrorHandler); ok {
 		dlg.Println("calling error message handler")
-		p.errFn(WithController(context.Background(), p), m, err)
+		eh.OnError(WithController(context.Background(), p), c, err)
+	} else {
+		c.Send(pr.Sprintf(MsgUnexpected))
 	}
 }
 
-func convertToMsg(cb *tb.Callback) *tb.Message {
-	msg := cb.Message
-	msg.Sender = cb.Sender
-	return msg
-}
+// // convertToMsg extracts the user message from the callback.
+// // TODO: remove
+// func convertToMsg(cb *tb.Callback) *tb.Message {
+// 	msg := cb.Message
+// 	msg.Sender = cb.Sender
+// 	return msg
+// }
 
+// nextHandler runs the next handler, if it's available.
 func (p *Picklist) nextHandler(c tb.Context) error {
 	if p.next != nil {
 		return p.next.Handler(c)
@@ -342,11 +337,15 @@ func (p *Picklist) nextHandler(c tb.Context) error {
 	return nil
 }
 
+// handleBackButton sends the empty response to telegram to acknowledge button
+// action and runs the previous handler if it's available. It will not return the
+// error on the response.
 func (p *Picklist) handleBackButton(ctx context.Context, c tb.Context) error {
 	if err := c.Respond(&tb.CallbackResponse{}); err != nil {
+		lg.Printf("%s: %s", caller(0), err)
 		trace.Log(ctx, "respond", err.Error())
 	}
-	c.Set(BackPressed.Error(), true)
+	p.setBackPressed(c)
 	if p.prev != nil {
 		return p.prev.Handler(c)
 	}

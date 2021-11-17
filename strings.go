@@ -1,11 +1,15 @@
 package tbcomctl
 
 import (
+	"crypto/rand"
+	"io"
+
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
 	tb "gopkg.in/tucnak/telebot.v3"
 )
 
+// Nvlstring returns the first non-empty string from the list.
 func Nvlstring(s string, ss ...string) string {
 	if s != "" {
 		return s
@@ -36,4 +40,32 @@ func Printer(lang string, fallback ...string) *message.Printer {
 		}
 	}
 	return message.NewPrinter(tag)
+}
+
+const (
+	randStringCharset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	randStringSz      = len(randStringCharset)
+)
+
+var randReader = rand.Reader
+
+// randString returns a random string of n size.
+func randString(n int) string {
+	var buf = make([]byte, n)
+	if x, err := randRead(buf); err != nil || x != n {
+		panic("error reading from crypto source")
+	}
+
+	var ret = make([]byte, n)
+	for i := range buf {
+		ret[i] = randStringCharset[buf[i]%byte(randStringSz)]
+	}
+	return string(ret)
+}
+
+// randRead is a helper function that calls Reader.Read using io.ReadFull.
+// On return, n == len(b) if and only if err == nil.
+// (copy of crypto/rand.Read)
+func randRead(b []byte) (n int, err error) {
+	return io.ReadFull(randReader, b)
 }

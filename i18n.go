@@ -8,7 +8,7 @@ import (
 const (
 	MsgUnexpected  = "🤯 (500) Unexpected error occurred."
 	MsgRetry       = "Incorrect choice."
-	MsgChooseVal   = "Choose value from the list:"
+	MsgChooseVal   = "Choose the value from the list:"
 	MsgOK          = "✅"
 	MsgVoteCounted = "✅ Vote counted."
 	MsgSubCheck    = "？ Check subscription >>"
@@ -19,7 +19,7 @@ var translations = map[language.Tag][]i18nmsg{
 	language.Russian: {
 		{MsgUnexpected, "🤯 (500) Произошло недоразумение."},
 		{MsgRetry, "Неверный выбор"},
-		{MsgChooseVal, "Выберите из списка:"},
+		{MsgChooseVal, "Выберите значение из списка:"},
 		{MsgVoteCounted, "✅ Голос учтен."},
 		{MsgSubCheck, "？ Проверить подписку >>"},
 		{MsgSubNoSub, "❌ Вы не подписались на один или более необходимых каналов."},

@@ -31,11 +31,8 @@ func main() {
 	nameIp := tbcomctl.NewInputText("name", "Input your name:", processInput(b))
 	ageIp := tbcomctl.NewInputText("age", "Input your age", processInput(b))
 
-	handler := tbcomctl.NewControllerChain(nameIp, ageIp)
 	form := tbcomctl.NewForm(nameIp, ageIp)
-
-	b.Handle("/input", handler)
-	b.Handle("/form", form.Handler)
+	b.Handle("/input", form.Handler)
 	// b.Handle(tb.OnText, tbcomctl.NewMiddlewareChain(onText, nameIp.OnTextMw, ageIp.OnTextMw))
 	b.Handle(tb.OnText, form.OnTextMiddleware(func(c tb.Context) error {
 		log.Printf("onText is called: %q\nuser data: %v", c.Message().Text, form.Data(c.Sender()))

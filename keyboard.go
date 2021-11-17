@@ -45,7 +45,7 @@ func NewKeyboard(cmds KeyboardCommands, opts ...KbdOption) *Keyboard {
 func (k *Keyboard) Markup(b *tb.Bot, lang string) *tb.ReplyMarkup {
 	m := &tb.ReplyMarkup{ResizeKeyboard: true}
 
-	p := Printer(lang, k.lang)
+	p := Printer(lang, k.fallbackLang)
 	var btns []tb.Btn
 	for _, kc := range k.cmds {
 		btn := m.Text(p.Sprintf(string(kc.Label)))

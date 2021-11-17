@@ -28,7 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sc := tbcomctl.NewSubChecker("sc", tbcomctl.TextFn("test sub"), []int64{chat})
+	sc := tbcomctl.NewSubChecker("sc", tbcomctl.NewTexter("test sub"), []int64{chat})
 
 	b.Handle("/subcheck", sc.Handler)
 

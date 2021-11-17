@@ -4,11 +4,20 @@ import (
 	tb "gopkg.in/tucnak/telebot.v3"
 )
 
+// Form is an abstraction that presents controllers in a way of a form. It can be
+// viewed as an interactive form that user might fill in. Each of the controllers
+// records the value that was entered, or selected, by the user. At any stage,
+// caller may call the Data member function providing User ID as an argument, and
+// that will return all the values in a mapping between the controller name and
+// the user input that will contain all the values, entered by the user so far.
 type Form struct {
 	ctrls []Controller
 	cm    map[string]Controller
 }
 
+// NewForm creates a new Form from a set of Controllers. The Controllers will be
+// called in the same order they will appear in the argument list. Controllers
+// must all have a unique name (within a form), otherwise NewForm will panic.
 func NewForm(ctrls ...Controller) *Form {
 	if len(ctrls) == 0 {
 		panic("creating form with no controllers")
@@ -19,6 +28,7 @@ func NewForm(ctrls ...Controller) *Form {
 	// name->controller map
 	fm.cm = make(map[string]Controller, len(fm.ctrls))
 
+	// populating the controller links.
 	var prev Controller
 	for i, ct := range fm.ctrls {
 		var next Controller
@@ -59,6 +69,8 @@ func (fm *Form) SetRemoveButtons(b bool) *Form {
 	return fm
 }
 
+// Handler is the form handler.  It calls the handler of the first controller in
+// the chain.
 func (fm *Form) Handler(c tb.Context) error {
 	return fm.ctrls[0].Handler(c)
 }
@@ -73,9 +85,11 @@ type onTexter interface {
 	OnTextMw(fn tb.HandlerFunc) tb.HandlerFunc
 }
 
-// OnTextMiddleware returns the middleware for OnText handler.
+// OnTextMiddleware returns the middleware for the OnText handler.
+//   var f Form
+//   tb.Handle(OnText, f.OnTextMiddleware(/*other handlers*/))
 func (fm *Form) OnTextMiddleware(onText tb.HandlerFunc) tb.HandlerFunc {
-	var mwfn []MiddlewareFunc
+	var mwfn []tb.MiddlewareFunc
 	for _, ctrl := range fm.ctrls {
 		otmw, ok := ctrl.(onTexter) // if the control satisfies onTexter, it contains middleware function
 		if !ok {
@@ -86,7 +100,7 @@ func (fm *Form) OnTextMiddleware(onText tb.HandlerFunc) tb.HandlerFunc {
 	return middlewareChain(onText, mwfn...)
 }
 
-func middlewareChain(final tb.HandlerFunc, mw ...MiddlewareFunc) tb.HandlerFunc {
+func middlewareChain(final tb.HandlerFunc, mw ...tb.MiddlewareFunc) tb.HandlerFunc {
 	var handler = final
 	for i := len(mw) - 1; i >= 0; i-- {
 		handler = mw[i](handler)

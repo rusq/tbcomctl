@@ -114,26 +114,26 @@ func (nologger) Println(v ...interface{})               {}
 func (nologger) Printf(format string, a ...interface{}) {}
 
 // logCallback logs callback data.
-func (c *commonCtl) logCallback(cb *tb.Callback) {
+func (cc *commonCtl) logCallback(cb *tb.Callback) {
 	dlg.Printf("%s: callback dump: %s", Userinfo(cb.Sender), Sdump(cb))
 
-	reqID, at := c.reqIDInfo(cb.Sender, cb.Message.ID)
+	reqID, at := cc.reg.RequestInfo(cb.Sender, cb.Message.ID)
 	lg.Printf("%s> %s: msg sent at %s, user response in: %s, callback data: %q", reqID, Userinfo(cb.Sender), at, time.Since(at), cb.Data)
 }
 
 // logCallback logs callback data.
-func (c *commonCtl) logCallbackMsg(m *tb.Message) {
+func (cc *commonCtl) logCallbackMsg(m *tb.Message) {
 	dlg.Printf("%s: callback msg dump: %s", Userinfo(m.Sender), Sdump(m))
 
-	outboundID := c.outboundID(m.Sender)
-	reqID, at := c.reqIDInfo(m.Sender, outboundID)
+	outboundID := cc.reg.WaitMsgID(m.Sender)
+	reqID, at := cc.reg.RequestInfo(m.Sender, outboundID)
 	lg.Printf("%s> %s: msg sent at %s, user response in: %s, message data: %q", reqID, Userinfo(m.Sender), at, time.Since(at), m.Text)
 }
 
 // logOutgoingMsg logs the outgoing message and any additional string info passed in s.
-func (c *commonCtl) logOutgoingMsg(m *tb.Message, s ...string) {
+func (cc *commonCtl) logOutgoingMsg(m *tb.Message, s ...string) {
 	dlg.Printf("%s: message dump: %s", Userinfo(m.Sender), Sdump(m))
 
-	reqID, at := c.reqIDInfo(m.Chat, m.ID)
+	reqID, at := cc.reg.RequestInfo(m.Chat, m.ID)
 	lg.Printf("%s> msg to chat: %s, req time: %s: %s", reqID, ChatInfo(m.Chat), at, strings.Join(s, " "))
 }

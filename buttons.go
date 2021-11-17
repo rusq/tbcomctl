@@ -69,7 +69,7 @@ func ButtonMarkup(c tb.Context, values []string, maxRowButtons int, cbFn func(c 
 	return markup
 }
 
-func ButtonPatternMarkup(c tb.Context, values []string, pattern []uint, cbFn func(c tb.Context) error) (*tb.ReplyMarkup, error) {
+func ButtonPatternMarkup(c tb.Context, values []string, pattern []uint, cbFn tb.HandlerFunc) (*tb.ReplyMarkup, error) {
 	markup, btns := createButtons(c, values, cbFn)
 	rows, err := organizeButtonsPattern(btns, pattern)
 	if err != nil {

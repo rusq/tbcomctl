@@ -22,12 +22,20 @@ Utilities:
 * Middleware - some helpful middleware functions.
 * Helper functions for logging, etc.
 
+Breaking Changes in V4
+======================
+
+Controls now operate on Interfaces defined in `interface.go` rather than functions.
+There's a new convenience structure TVC which can be used to wrap the functions when updating to v4.
+
+See examples_ for usage.
+
 Installation
 ============
 
 For Telebot_ v3::
   
-  go get github.com/rusq/tbcomctl/v3
+  go get github.com/rusq/tbcomctl/v4
 
 For Telebot_ v2::
   

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/text/language"
 	tb "gopkg.in/tucnak/telebot.v3"
 
-	"github.com/rusq/tbcomctl/v3/internal/registry"
+	"github.com/rusq/tbcomctl/v4/internal/registry"
 )
 
 const (

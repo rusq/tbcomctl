@@ -34,6 +34,11 @@ type Controller interface {
 	OutgoingID(recipient string) (int, bool)
 }
 
+// HandleContextFunc is the callback function that is being called within
+// controller callbacks. It should return the errors specific to controller
+// requirements for the input to be processed.
+type HandleContextFunc func(ctx context.Context, c tb.Context) error
+
 // Texter is the interface that contains only the method to return the Message
 // Text.
 type Texter interface {
@@ -91,12 +96,12 @@ type TextValueCallbacker interface {
 type TVC struct {
 	TextFn   func(context.Context, tb.Context) (string, error)
 	ValuesFn func(context.Context, tb.Context) ([]string, error)
-	CBfn     func(context.Context, tb.Context) error
+	CBfn     HandleContextFunc
 }
 
 // NewStaticTVC is a convenience constructor for TVC (TextValueCallbacker) with
 // static text and values.
-func NewStaticTVC(text string, values []string, callbackFn func(context.Context, tb.Context) error) *TVC {
+func NewStaticTVC(text string, values []string, callbackFn HandleContextFunc) *TVC {
 	return &TVC{
 		TextFn:   func(_ context.Context, _ tb.Context) (string, error) { return text, nil },
 		ValuesFn: func(_ context.Context, _ tb.Context) ([]string, error) { return values, nil },

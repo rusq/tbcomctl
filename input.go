@@ -29,11 +29,6 @@ var (
 	_ onTexter   = &Input{}
 )
 
-// MsgErrFunc is the function that processes the user input.  If the input is
-// invalid, it should return InputError with the message, then the user is
-// offered to retry the input.
-type MsgErrFunc func(ctx context.Context, c tb.Context) error
-
 type InputOption func(*Input)
 
 func IOptNoReply(b bool) InputOption {
@@ -52,9 +47,10 @@ func IOptPrivateOnly(b bool) InputOption {
 // handler. One must use Handle as a handler for bot endpoint, and then hook the
 // OnText to OnTextMw.  TextCallbacker.Text should produce the text that user
 // initially sees, TextCallbacker.Callback is the function that should process
-// the user input. It should return an error if the user input is not accepted,
-// and then user is offered to retry.  It can format the return error with
-// fmt.Errorf, as this is what will be presented to the user.
+// the user input. It should return an InputError if the user input is not
+// accepted, and in this case the user is offered to retry the input.  It can
+// format the return error with fmt.Errorf, as this is what will be presented to
+// the user.
 func NewInput(name string, tc TextCallbacker, opts ...InputOption) *Input {
 	ip := &Input{
 		commonCtl: newCommonCtl(name),
@@ -67,7 +63,8 @@ func NewInput(name string, tc TextCallbacker, opts ...InputOption) *Input {
 }
 
 // NewIntputText is the shortcut to create the Input instance with static text.
-func NewInputText(name string, text string, onTextFn MsgErrFunc, opts ...InputOption) *Input {
+// onTextFn should return InputError if the user input is not valid.
+func NewInputText(name string, text string, onTextFn HandleContextFunc, opts ...InputOption) *Input {
 	return NewInput(name, NewStaticTVC(text, nil, onTextFn), opts...)
 }
 

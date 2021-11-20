@@ -2,6 +2,7 @@ package tbcomctl
 
 import (
 	"context"
+	"errors"
 
 	tb "gopkg.in/tucnak/telebot.v3"
 )
@@ -97,6 +98,8 @@ type TVC struct {
 	TextFn   func(context.Context, tb.Context) (string, error)
 	ValuesFn func(context.Context, tb.Context) ([]string, error)
 	CBfn     HandleContextFunc
+
+	ErrorFn func(ctx context.Context, c tb.Context, err error)
 }
 
 // NewStaticTVC is a convenience constructor for TVC (TextValueCallbacker) with
@@ -111,14 +114,54 @@ func NewStaticTVC(text string, values []string, callbackFn HandleContextFunc) *T
 
 // Text callse the TextFn with contexts.
 // ctx is legacy from the times when there was not telebot.Context.
-func (t TVC) Text(ctx context.Context, c tb.Context) (string, error) {
+func (t *TVC) Text(ctx context.Context, c tb.Context) (string, error) {
+	if t.TextFn == nil {
+		return "", errors.New("text function is not defined")
+	}
 	return t.TextFn(ctx, c)
 }
 
-func (t TVC) Values(ctx context.Context, c tb.Context) ([]string, error) {
+func (t *TVC) Values(ctx context.Context, c tb.Context) ([]string, error) {
+	if t.ValuesFn == nil {
+		return nil, errors.New("values function is not defined")
+	}
 	return t.ValuesFn(ctx, c)
 }
 
-func (t TVC) Callback(ctx context.Context, c tb.Context) error {
+func (t *TVC) Callback(ctx context.Context, c tb.Context) error {
+	if t.CBfn == nil {
+		return errors.New("callback function is not defined")
+	}
 	return t.CBfn(ctx, c)
+}
+
+func (t *TVC) OnError(ctx context.Context, c tb.Context, err error) error {
+	if t.ErrorFn == nil {
+		return nil
+	}
+	return t.OnError(ctx, c, err)
+}
+
+// WithTextFn sets the text function to fn.
+func (t *TVC) WithTextFn(fn func(context.Context, tb.Context) (string, error)) *TVC {
+	t.TextFn = fn
+	return t
+}
+
+// WithValuesFn sets the value function to fn.
+func (t *TVC) WithValuesFn(fn func(context.Context, tb.Context) ([]string, error)) *TVC {
+	t.ValuesFn = fn
+	return t
+}
+
+// WithCallbackFn sets the callback function to fn.
+func (t *TVC) WithCallbackFn(fn HandleContextFunc) *TVC {
+	t.CBfn = fn
+	return t
+}
+
+// WithErrorFn sets the error handling function to fn.
+func (t *TVC) WithErrorFn(fn func(ctx context.Context, c tb.Context, err error)) *TVC {
+	t.ErrorFn = fn
+	return t
 }

@@ -43,7 +43,7 @@ func NewSubChecker(name string, t Texter, chats []int64, opts ...SCOption) *SubC
 	// SubChecker uses picklist for its filthy job.
 	pl := NewPicklist(
 		"$subcheck"+randString(8), // assigning a fake name
-		&TVC{t.Text, sc.valuesFn, sc.callback},
+		&TVC{TextFn: t.Text, ValuesFn: sc.valuesFn, CBfn: sc.callback},
 		PickOptRemoveButtons(true),
 	)
 	sc.pl = pl

@@ -7,7 +7,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/rusq/osenv"
-	"github.com/rusq/tbcomctl/v3"
+	"github.com/rusq/tbcomctl/v4"
 	tb "gopkg.in/tucnak/telebot.v3"
 )
 
@@ -28,7 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	sc := tbcomctl.NewSubChecker("sc", tbcomctl.TextFn("test sub"), []int64{chat})
+	sc := tbcomctl.NewSubChecker("sc", tbcomctl.NewTexter("test sub"), []int64{chat})
 
 	b.Handle("/subcheck", sc.Handler)
 

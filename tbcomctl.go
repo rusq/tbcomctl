@@ -7,73 +7,38 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"strconv"
-	"sync"
-	"time"
 
 	"golang.org/x/text/language"
-
-	"github.com/google/uuid"
-
 	tb "gopkg.in/tucnak/telebot.v3"
+
+	"github.com/rusq/tbcomctl/v4/internal/registry"
 )
 
 const (
+	// FallbackLang is the default fallback language.
 	FallbackLang = "en-US"
 )
-const (
-	unknown = "[unknown]"
-)
-
-// Controller is the interface that some of the common controls implement.  Controllers can
-// be chained together
-type Controller interface {
-	// Handler is the controller's message handler.
-	Handler(c tb.Context) error
-	// Name returns the name of the control assigned to it on creation.  When
-	// Controller is a part of a form, one can call Form.Controller(name) method
-	// to get the controller.
-	Name() string
-	// SetNext sets the next handler, when control is part of a form.
-	SetNext(Controller)
-	// SetPrev sets the previous handler.
-	SetPrev(Controller)
-	// SetForm assigns the form to the controller, this will allow controller to
-	// address other controls in a form by name.
-	SetForm(*Form)
-	// Form returns the form associated with the controller.
-	Form() *Form
-	// Value returns the value stored in the controller for the recipient.
-	Value(recipient string) (string, bool)
-	// OutgoingID should return the value of the outgoing message ID for the
-	// user and true if the message is present or false otherwise.
-	OutgoingID(recipient string) (int, bool)
-}
 
 type overwriter interface {
 	setOverwrite(b bool)
 }
 
 type commonCtl struct {
-	// b Boter
+	name string // name of the control, must be unique if used within chained controls.
 
-	name string // name of the control, must be unique if used within chained controls
-	prev Controller
-	next Controller
-	form *Form // if not nil, controller is part of the form.
+	prev Controller // if nil - this is the first controller in the chain
+	next Controller // if nil - this is the last controller in the chain.
+	form *Form      // if not nil, controller is part of the form.
 
-	textFn TextFunc
-	errFn  ErrFunc
+	hError ErrorHandler // custom error handler.
 
-	privateOnly bool
+	privateOnly bool // should handle only private messages
 	overwrite   bool // overwrite the previous message sent by control.
 
-	reqCache map[string]map[int]uuid.UUID // requests cache, maps message ID to request.
-	await    map[string]int               // await maps userID to the messageID and indicates that we're waiting for user to reply.
-	values   map[string]string            // values entered, maps userID to the value
-	messages map[string]int               // messages sent, maps userID to the message_id
-	mu       sync.RWMutex
+	fallbackLang string          // fallback language for i18n
+	sendOpts     *tb.SendOptions // default send options.
 
-	lang string
+	reg *registry.Memory
 }
 
 // PrivateOnly is the middleware that restricts the handler to only private
@@ -82,12 +47,14 @@ func PrivateOnly(fn tb.HandlerFunc) tb.HandlerFunc {
 	return PrivateOnlyMsg("", fn)
 }
 
+// PrivateOnlyMsg returns the handler that will reject non-private messages (eg.
+// sent in groups) with i18n formatted message.
 func PrivateOnlyMsg(msg string, fn tb.HandlerFunc) tb.HandlerFunc {
 	return func(c tb.Context) error {
 		if !c.Message().Private() {
 			if msg != "" {
 				pr := Printer(c.Sender().LanguageCode)
-				c.Send(pr.Sprintf(msg))
+				return c.Send(pr.Sprintf(msg))
 			}
 			return nil
 		}
@@ -95,19 +62,21 @@ func PrivateOnlyMsg(msg string, fn tb.HandlerFunc) tb.HandlerFunc {
 	}
 }
 
-type controllerKey int
+type controllerKey int    // controller key type for context
+var ctrlKey controllerKey // controller key for context.
 
-var ctrlKey controllerKey
-
+// WithController adds the controller to the context.
 func WithController(ctx context.Context, ctrl Controller) context.Context {
 	return context.WithValue(ctx, ctrlKey, ctrl)
 }
 
+// ControllerFromCtx returns the controller from the context.
 func ControllerFromCtx(ctx context.Context) (Controller, bool) {
 	ctrl, ok := ctx.Value(ctrlKey).(Controller)
 	return ctrl, ok
 }
 
+// StoredMessage represents the stored message in the database.
 type StoredMessage struct {
 	MessageID string
 	ChatID    int64
@@ -117,110 +86,58 @@ func (m StoredMessage) MessageSig() (string, int64) {
 	return m.MessageID, m.ChatID
 }
 
-// ValuesFunc returns values for inline buttons, possibly personalised for user u.
-type ValuesFunc func(ctx context.Context, u *tb.User) ([]string, error)
-
-// TextFunc returns formatted text, possibly personalised for user u.
-type TextFunc func(ctx context.Context, u *tb.User) (string, error)
-
-// MiddlewareFunc is the function that wraps a telebot handler and returns a handler.
-type MiddlewareFunc func(tb.HandlerFunc) tb.HandlerFunc
-
-// ErrFunc is the error processing function.
-type ErrFunc func(ctx context.Context, m *tb.Message, err error)
-
-// BtnCallbackFunc is being called once the user picks the value, it should return error if the value is incorrect, or
-// ErrRetry if the retry should be performed.
-type BtnCallbackFunc func(ctx context.Context, c tb.Context) error
-
 var hasher = sha1.New
 
+// hash returns the hash of the s, using the hasher function.
 func hash(s string) string {
 	h := hasher()
 	h.Write([]byte(s))
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
+// option is the function signature for options that are common to all the
+// controls. Concrete control implementations should use these options, if they
+// must implement this functionality.
 type option func(ctl *commonCtl)
 
+// optPrivateOnly sets the control to be operatable only in the private mode.
 func optPrivateOnly(b bool) option {
 	return func(ctl *commonCtl) {
 		ctl.privateOnly = b
 	}
 }
 
-func optErrFunc(fn ErrFunc) option {
+// optErrFunc sets the error handler.
+func optErrFunc(h ErrorHandler) option {
 	return func(ctl *commonCtl) {
-		ctl.errFn = fn
+		ctl.hError = h
 	}
 }
 
+// optFallbackLang sets the default fallback language for the control.
 func optFallbackLang(lang string) option {
 	return func(ctl *commonCtl) {
 		_ = language.MustParse(lang) // will panic if wrong.
-		ctl.lang = lang
+		ctl.fallbackLang = lang
 	}
 }
 
-// newCommonCtl creates a new commonctl instance.
-func newCommonCtl(name string, textFn TextFunc) commonCtl {
+// optDefaultSendOpts allows to set the default send options.  If this option is
+// not in the option list, the built-in defaults are used.
+func optDefaultSendOpts(opts *tb.SendOptions) option {
+	return func(ctl *commonCtl) {
+		ctl.sendOpts = opts
+	}
+}
+
+// newCommonCtl creates a new commonCtl instance.  It gives most of the
+// functions that satisfy Controller interface for free.
+func newCommonCtl(name string) commonCtl {
 	return commonCtl{
 		name:     name,
-		textFn:   textFn,
-		messages: make(map[string]int),
+		reg:      registry.NewMemRegistry(),
+		sendOpts: &tb.SendOptions{ParseMode: tb.ModeHTML},
 	}
-}
-
-// register registers message in cache assigning it a request id.
-func (c *commonCtl) register(r tb.Recipient, msgID int) uuid.UUID {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.requestEnsure(r)
-
-	reqID := uuid.Must(uuid.NewUUID())
-	c.reqCache[r.Recipient()][msgID] = reqID
-	c.messages[r.Recipient()] = msgID
-	return reqID
-}
-
-// requestEnsure ensures that request cache is initialised.
-func (c *commonCtl) requestEnsure(r tb.Recipient) {
-	if c.reqCache == nil {
-		c.reqCache = make(map[string]map[int]uuid.UUID)
-	}
-	if c.reqCache[r.Recipient()] == nil {
-		c.reqCache[r.Recipient()] = make(map[int]uuid.UUID)
-	}
-}
-
-// requestFor returns a request id for message ID and a bool. Bool will be true if
-// message is registered and false otherwise.
-func (c *commonCtl) requestFor(r tb.Recipient, msgID int) (uuid.UUID, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	c.requestEnsure(r)
-
-	reqID, ok := c.reqCache[r.Recipient()][msgID]
-	return reqID, ok
-}
-
-// unregister unregisters the request from cache.
-func (c *commonCtl) unregister(r tb.Recipient, msgID int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	delete(c.reqCache[r.Recipient()], msgID)
-}
-
-// reqIDInfo returns a request ID (or <unknown) and a time of the request (or zero time).
-func (c *commonCtl) reqIDInfo(r tb.Recipient, msgID int) (string, time.Time) {
-	reqID, ok := c.requestFor(r, msgID)
-	if !ok {
-		return unknown, time.Time{}
-	}
-	return reqID.String(), time.Unix(reqID.Time().UnixTime())
 }
 
 // multibuttonMarkup returns a markup containing a bunch of buttons.  If
@@ -228,7 +145,7 @@ func (c *commonCtl) reqIDInfo(r tb.Recipient, msgID int) (string, time.Time) {
 // telegram button will have a button index pressed by the user in the
 // callback.Data. Prefix is the prefix that will be prepended to the unique
 // before hash is called to form the Control-specific unique fields.
-func (c *commonCtl) multibuttonMarkup(b *tb.Bot, btns []Button, showCounter bool, prefix string, cbFn func(tb.Context) error) *tb.ReplyMarkup {
+func (cc *commonCtl) multibuttonMarkup(b *tb.Bot, btns []Button, showCounter bool, prefix string, cbFn func(tb.Context) error) *tb.ReplyMarkup {
 	const (
 		sep = ": "
 	)
@@ -250,19 +167,22 @@ func (c *commonCtl) multibuttonMarkup(b *tb.Bot, btns []Button, showCounter bool
 }
 
 // SetNext sets next controller in the chain.
-func (c *commonCtl) SetNext(ctrl Controller) {
+func (cc *commonCtl) SetNext(ctrl Controller) {
 	if ctrl != nil {
-		c.next = ctrl
+		cc.next = ctrl
 	}
 }
 
 // SetPrev sets the previous controller in the chain.
-func (c *commonCtl) SetPrev(ctrl Controller) {
+func (cc *commonCtl) SetPrev(ctrl Controller) {
 	if ctrl != nil {
-		c.prev = ctrl
+		cc.prev = ctrl
 	}
 }
 
+// NewControllerChain returns the controller chain.
+//
+// Deprecated: use NewForm instead.  NewControllerChain will be removed in the next versions.
 func NewControllerChain(first Controller, cc ...Controller) tb.HandlerFunc {
 	var chain Controller
 	for i := len(cc) - 1; i >= 0; i-- {
@@ -273,124 +193,91 @@ func NewControllerChain(first Controller, cc ...Controller) tb.HandlerFunc {
 	return first.Handler
 }
 
-// Value returns the Controller value for the recipient.
-func (c *commonCtl) Value(recipient string) (string, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	if c.values == nil {
-		c.values = make(map[string]string)
-	}
-	v, ok := c.values[recipient]
-	return v, ok
+// Name returns the controller name.
+func (cc *commonCtl) Name() string {
+	return cc.name
 }
 
-// SetValue sets the Controller value.
-func (c *commonCtl) SetValue(recipient string, value string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.values == nil {
-		c.values = make(map[string]string)
-	}
-	c.values[recipient] = value
+// SetForm links the controller to the form.
+func (cc *commonCtl) SetForm(fm *Form) {
+	cc.form = fm
 }
 
-//
-// waiting function
-//
-
-// waitFor places the outbound message ID to the waiting list.  Message ID in
-// outbound waiting list means that we expect the user to respond.
-func (c *commonCtl) waitFor(r tb.Recipient, outboundID int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.await == nil {
-		c.await = make(map[string]int)
-	}
-	c.await[r.Recipient()] = outboundID
+// Form returns the form.
+func (cc *commonCtl) Form() *Form {
+	return cc.form
 }
 
-func (c *commonCtl) stopWaiting(r tb.Recipient) int {
-	outboundID := c.await[r.Recipient()]
-	c.await[r.Recipient()] = nothing
-	return outboundID
+// setOverwite sets overwrite flag to b.
+func (cc *commonCtl) setOverwrite(b bool) {
+	cc.overwrite = b
 }
 
-func (c *commonCtl) outboundID(r tb.Recipient) int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.await[r.Recipient()]
-}
-
-func (c *commonCtl) isWaiting(r tb.Recipient) bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.await[r.Recipient()] != nothing
-}
-
-func (c *commonCtl) Name() string {
-	return c.name
-}
-
-func (c *commonCtl) SetForm(fm *Form) {
-	c.form = fm
-}
-
-func (c *commonCtl) Form() *Form {
-	return c.form
-}
-
-// OutgoingID returns the controller's outgoing message ID for the user.
-func (c *commonCtl) OutgoingID(recipient string) (int, bool) {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-
-	id, ok := c.messages[recipient]
-	return id, ok
-}
-
-// TextFn wraps the message in a TextFunc.
-func TextFn(msg string) TextFunc {
-	return func(ctx context.Context, u *tb.User) (string, error) {
-		return msg, nil
-	}
-}
-
-func (c *commonCtl) setOverwrite(b bool) {
-	c.overwrite = b
-}
-
-func (c *commonCtl) sendOrEdit(ct tb.Context, txt string, sendOpts ...interface{}) (*tb.Message, error) {
+// sendOrEdit sends the message or edits the previous one if the overwrite flag is true.  It returns the outbound
+// message and an error.
+func (cc *commonCtl) sendOrEdit(c tb.Context, txt string, sendOpts ...interface{}) (*tb.Message, error) {
 	var outbound *tb.Message
 	var err error
-	msgID, ok := c.getPreviousMsgID(ct)
-	if c.overwrite && ok {
-		prevMsg := tb.Message{ID: msgID, Chat: ct.Chat()}
-		outbound, err = ct.Bot().Edit(&prevMsg,
+	msgID, ok := cc.getPreviousMsgID(c)
+	if cc.overwrite && ok {
+		prevMsg := tb.Message{ID: msgID, Chat: c.Chat()}
+		outbound, err = c.Bot().Edit(&prevMsg,
 			txt,
 			sendOpts...,
 		)
 	} else {
-		outbound, err = ct.Bot().Send(ct.Chat(), txt, sendOpts...)
+		outbound, err = c.Bot().Send(c.Chat(), txt, sendOpts...)
 	}
 	return outbound, err
 }
 
-func (c *commonCtl) getPreviousMsgID(ct tb.Context) (int, bool) {
-	backPressed, ok := ct.Get(BackPressed.Error()).(bool)
-	if ok && backPressed {
-		ct.Set(BackPressed.Error(), false) // reset the context value
-		if c.next == nil {
+// getPreviousMsgID returns the ID of the previous outbound message.
+func (cc *commonCtl) getPreviousMsgID(ct tb.Context) (int, bool) {
+	if cc.isBackPressed(ct) {
+		cc.resetBackPressed(ct)
+		if cc.next == nil {
 			// internal error
 			return 0, false
 		}
-		return c.next.OutgoingID(ct.Sender().Recipient())
+		return cc.next.OutgoingID(ct.Sender().Recipient())
 	}
 	// back not pressed
-	if c.prev == nil {
+	if cc.prev == nil {
 		return 0, false
 	}
-	return c.prev.OutgoingID(ct.Sender().Recipient())
+	return cc.prev.OutgoingID(ct.Sender().Recipient())
+}
 
+// isBackPressed returns true if the "back" button was pressed.
+func (cc *commonCtl) isBackPressed(ct tb.Context) bool {
+	backPressed, ok := ct.Get(BackPressed.Error()).(bool)
+	return ok && backPressed
+}
+
+func (cc *commonCtl) setBackPressed(ct tb.Context) {
+	ct.Set(BackPressed.Error(), true)
+}
+
+func (cc *commonCtl) resetBackPressed(ct tb.Context) {
+	ct.Set(BackPressed.Error(), false) // reset the context value
+}
+
+func unexpectedErrorText(c tb.Context, fallbackLang ...string) string {
+	pr := PrinterContext(c, fallbackLang...)
+	return pr.Sprintf(MsgUnexpected)
+}
+
+// OutgoingID returns the controller's outgoing message ID for the user.
+func (cc *commonCtl) OutgoingID(recipient string) (int, bool) {
+	return cc.reg.OutgoingID(recipient)
+}
+
+// Value returns the Controller value for the recipient.
+func (cc *commonCtl) Value(recipient string) (string, bool) {
+	return cc.reg.Value(recipient)
+}
+
+// SetValue sets the Controller value.
+func (cc *commonCtl) SetValue(recipient string, value string) {
+	cc.reg.SetValue(recipient, value)
 }

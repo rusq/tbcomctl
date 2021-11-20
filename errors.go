@@ -25,7 +25,6 @@ var (
 	ErrRetry = &Error{Type: TErrRetry, Msg: "retry", Alert: true}
 	// ErrNoChange should be returned if the user picked the same value as before, and no update needed.
 	ErrNoChange = &Error{Type: TErrNoChange, Msg: "no change"}
+	// BackPressed is a special type of error indicating that callback handler should call the previous handler.
+	BackPressed = errors.New("back") //lint:ignore ST1012 it is what it is
 )
-
-// BackPressed is a special type of error indicating that callback handler should call the previous handler.
-var BackPressed = errors.New("back")

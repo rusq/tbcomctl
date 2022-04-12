@@ -48,6 +48,12 @@ func IOptPrivateOnly(b bool) InputOption {
 	}
 }
 
+func IOptValueResolver(fn ValueResolver) InputOption {
+	return func(ip *Input) {
+		ip.valueResolverFn = fn
+	}
+}
+
 // NewInput text creates a new text input, optionally chaining with the `next`
 // handler. One must use Handle as a handler for bot endpoint, and then hook the
 // OnText to OnTextMw.  TextCallbacker.Text should produce the text that user
@@ -72,10 +78,6 @@ func NewInput(name string, tc TextCallbacker, opts ...InputOption) *Input {
 // onTextFn should return InputError if the user input is not valid.
 func NewInputText(name string, text string, onTextFn HandleContextFunc, opts ...InputOption) *Input {
 	return NewInput(name, NewStaticTVC(text, nil, onTextFn), opts...)
-}
-
-func (ip *Input) SetValueResolver(fn ValueResolver) {
-	ip.valueResolverFn = fn
 }
 
 func (ip *Input) Handler(c tb.Context) error {

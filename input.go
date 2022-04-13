@@ -20,8 +20,13 @@ type Input struct {
 	// it returns the error, user will be informed about it.
 	tc TextCallbacker
 
+	// valueResolverFn helps the input to get the correct value from the incoming message
+	valueResolverFn ValueResolver
+
 	noReply bool
 }
+
+type ValueResolver func(*tb.Message) (string, error)
 
 // interface assertions
 var (
@@ -43,6 +48,12 @@ func IOptPrivateOnly(b bool) InputOption {
 	}
 }
 
+func IOptValueResolver(fn ValueResolver) InputOption {
+	return func(ip *Input) {
+		ip.valueResolverFn = fn
+	}
+}
+
 // NewInput text creates a new text input, optionally chaining with the `next`
 // handler. One must use Handle as a handler for bot endpoint, and then hook the
 // OnText to OnTextMw.  TextCallbacker.Text should produce the text that user
@@ -53,8 +64,9 @@ func IOptPrivateOnly(b bool) InputOption {
 // the user.
 func NewInput(name string, tc TextCallbacker, opts ...InputOption) *Input {
 	ip := &Input{
-		commonCtl: newCommonCtl(name),
-		tc:        tc,
+		commonCtl:       newCommonCtl(name),
+		tc:              tc,
+		valueResolverFn: func(msg *tb.Message) (string, error) { return msg.Text, nil },
 	}
 	for _, opt := range opts {
 		opt(ip)
@@ -118,7 +130,11 @@ func (ip *Input) OnTextMw(fn tb.HandlerFunc) tb.HandlerFunc {
 			}
 		}
 
-		ip.SetValue(c.Sender().Recipient(), c.Message().Text)
+		dataValue, err := ip.valueResolverFn(c.Message())
+		if err != nil {
+			return err
+		}
+		ip.SetValue(c.Sender().Recipient(), dataValue)
 
 		ip.logCallbackMsg(c.Message())
 		ip.reg.Unregister(c.Sender(), ip.reg.StopWait(c.Sender())) // stop waiting and unregister message.

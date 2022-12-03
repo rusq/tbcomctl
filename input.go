@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 const retryDelay = 500 * time.Millisecond

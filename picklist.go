@@ -7,7 +7,7 @@ import (
 	"runtime/trace"
 	"strings"
 
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 const (
@@ -86,18 +86,18 @@ func PickOptMaxInlineButtons(n int) PicklistOption {
 //
 // Example:
 //
-//   pattern: []uint{1, 2, 3}
-//   will produce the following markup for the picklist choices
+//	pattern: []uint{1, 2, 3}
+//	will produce the following markup for the picklist choices
 //
-//   +-------------------+
-//   | Picklist text     |
-//   +-------------------+
-//   |     button 1      |
-//   +---------+---------+
-//   | button 2| button 3|
-//   +------+--+---+-----+
-//   | btn4 | btn5 | btn6|
-//   +------+------+-----+
+//	+-------------------+
+//	| Picklist text     |
+//	+-------------------+
+//	|     button 1      |
+//	+---------+---------+
+//	| button 2| button 3|
+//	+------+--+---+-----+
+//	| btn4 | btn5 | btn6|
+//	+------+------+-----+
 func PickOptBtnPattern(pattern []uint) PicklistOption {
 	return func(p *Picklist) {
 		p.btnPattern = pattern

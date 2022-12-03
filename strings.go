@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/message"
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 // Nvlstring returns the first non-empty string from the list.

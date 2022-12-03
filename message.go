@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 // Message is the controller that sends a message.  It can be used to send a

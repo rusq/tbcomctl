@@ -1,5 +1,4 @@
 // Package tbcomctl provides common controls for telegram bots.
-//
 package tbcomctl
 
 import (
@@ -9,7 +8,7 @@ import (
 	"strconv"
 
 	"golang.org/x/text/language"
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 
 	"github.com/rusq/tbcomctl/v4/internal/registry"
 )

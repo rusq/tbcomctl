@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 // SubChecker is controller to check the chat subscription.

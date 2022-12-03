@@ -1,7 +1,7 @@
 package tbcomctl
 
 import (
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 // Form is an abstraction that presents controllers in a way of a form. It can be
@@ -86,8 +86,9 @@ type onTexter interface {
 }
 
 // OnTextMiddleware returns the middleware for the OnText handler.
-//   var f Form
-//   tb.Handle(OnText, f.OnTextMiddleware(/*other handlers*/))
+//
+//	var f Form
+//	tb.Handle(OnText, f.OnTextMiddleware(/*other handlers*/))
 func (fm *Form) OnTextMiddleware(onText tb.HandlerFunc) tb.HandlerFunc {
 	var mwfn []tb.MiddlewareFunc
 	for _, ctrl := range fm.ctrls {

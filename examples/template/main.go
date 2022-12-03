@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 var _ = godotenv.Load()

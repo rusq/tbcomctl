@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	tb "gopkg.in/tucnak/telebot.v3"
+	tb "gopkg.in/telebot.v3"
 )
 
 // Controller is the interface that some common controls implement. Controllers

@@ -84,7 +84,7 @@ func (rb *Rating) callback(c tb.Context) error {
 	// update the post with new buttons
 	if valErr != ErrAlreadyVoted {
 		if err := c.Edit(rb.Markup(c.Bot(), buttons)); err != nil {
-			if e, ok := err.(*tb.APIError); ok && e.Code == http.StatusBadRequest && strings.Contains(e.Description, "exactly the same") {
+			if e, ok := err.(*tb.Error); ok && e.Code == http.StatusBadRequest && strings.Contains(e.Description, "exactly the same") {
 				// same button pressed - not an error.
 				lg.Printf("%s: same button pressed", Userinfo(c.Sender()))
 			} else {

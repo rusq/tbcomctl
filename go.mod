@@ -9,7 +9,7 @@ require (
 	github.com/rusq/osenv v0.1.1
 	github.com/stretchr/testify v1.8.0
 	golang.org/x/text v0.4.0
-	gopkg.in/telebot.v3 v3.1.2
+	gopkg.in/telebot.v3 v3.4.1-beta
 )
 
 require (

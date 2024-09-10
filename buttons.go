@@ -99,13 +99,17 @@ func ButtonPatternMarkup(c tb.Context, values []string, pattern []uint, cbFn tb.
 	return markup, nil
 }
 
+func bot(b tb.API) *tb.Bot {
+	return b.(*tb.Bot)
+}
+
 func createButtons(c tb.Context, values []string, cbFn func(c tb.Context) error) (*tb.ReplyMarkup, []tb.Btn) {
 	markup := new(tb.ReplyMarkup)
 	var btns []tb.Btn
 	for _, label := range values {
 		btn := markup.Data(label, hash(label), label)
 		btns = append(btns, btn)
-		c.Bot().Handle(&btn, cbFn)
+		bot(c.Bot()).Handle(&btn, cbFn)
 	}
 	return markup, btns
 }

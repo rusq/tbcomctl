@@ -160,7 +160,7 @@ func (cc *commonCtl) multibuttonMarkup(b *tb.Bot, btns []Button, showCounter boo
 		b.Handle(&bn, cbFn)
 	}
 
-	markup.Inline(organizeButtons(buttons, defNumButtons)...)
+	markup.Inline(OrganizeButtons(buttons, defNumButtons)...)
 
 	return markup
 }

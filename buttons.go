@@ -85,7 +85,7 @@ func ButtonMarkup(c tb.Context, values []string, maxRowButtons int, cbFn func(c 
 		maxRowButtons = defNumButtons
 	}
 	markup, btns := createButtons(c, values, cbFn)
-	markup.Inline(organizeButtons(btns, maxRowButtons)...)
+	markup.Inline(OrganizeButtons(btns, maxRowButtons)...)
 	return markup
 }
 
@@ -114,8 +114,8 @@ func createButtons(c tb.Context, values []string, cbFn func(c tb.Context) error)
 	return markup, btns
 }
 
-// organizeButtons organizes buttons in rows, at most btnInRow per row.
-func organizeButtons(btns []tb.Btn, btnInRow int) []tb.Row {
+// OrganizeButtons organizes buttons in rows, at most btnInRow per row.
+func OrganizeButtons(btns []tb.Btn, btnInRow int) []tb.Row {
 	var rows []tb.Row
 	var buttons []tb.Btn
 	for i, btn := range btns {

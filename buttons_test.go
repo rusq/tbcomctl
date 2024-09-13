@@ -96,7 +96,7 @@ func Test_organizeButtons(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := organizeButtons(tt.args.btns, tt.args.btnInRow); !reflect.DeepEqual(got, tt.want) {
+			if got := OrganizeButtons(tt.args.btns, tt.args.btnInRow); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("organizeButtons() = %v, want %v", got, tt.want)
 			}
 		})
